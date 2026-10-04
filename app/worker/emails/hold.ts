@@ -6,12 +6,14 @@ import {
   formatEmailDate,
   formatEmailInstant,
   isolateLtrText,
+  isolatePersonName,
   ltrValue,
   renderEmailLayout,
   sanitizePersonName,
   stripBidiControls,
 } from '../email-templates.js'
 import type { NotificationKind } from '../notify/outbox.js'
+import type { ReceiptChannel } from '../settings/features.js'
 
 /**
  * Hold emails for flow 2 (ADR-001 §2.1, §2.2; 08-copy-ar §4.3 and §8.2): the
@@ -23,6 +25,14 @@ import type { NotificationKind } from '../notify/outbox.js'
  * The button deep-links to `/my-bookings?booking=<id>` built from
  * APP_BASE_URL. When APP_BASE_URL is unset or unusable the email is still
  * complete: it just has no button and names the page instead.
+ *
+ * Output safety (SB-6): every string reaches the HTML only through
+ * renderEmailLayout, which escapes it; her name is sanitised and wrapped in
+ * a first-strong isolate, and the booking reference in a left-to-right
+ * isolate, in the text and the HTML alike. No email carries bank details or
+ * the studio's number: the WhatsApp step points to the button on her
+ * bookings page, which shows the current number (with its change notice,
+ * TM-03) and records her notice, which protects the hold (B1).
  */
 
 export type HoldReminderKind = Extract<
@@ -32,9 +42,11 @@ export type HoldReminderKind = Extract<
 
 /** What she still owes before the deadline. */
 export type HoldOwedStep =
-  /** `approved_hold`: accept the terms and upload the deposit receipt. */
-  | 'terms_and_receipt'
-  /** `payment_pending` whose latest receipt was rejected: upload a new one. */
+  /** `approved_hold`, terms not yet accepted: accept them first. */
+  | 'accept_terms'
+  /** `approved_hold`, terms accepted: transfer the deposit, send the receipt. */
+  | 'deposit_receipt'
+  /** `payment_pending` whose latest receipt was rejected: send a new one. */
   | 'new_receipt'
 
 export interface HoldReminderEmailInput {
@@ -47,6 +59,11 @@ export interface HoldReminderEmailInput {
   /** The deadline, an ISO instant. */
   readonly holdExpiresAt: string
   readonly owedStep: HoldOwedStep
+  /**
+   * Where her receipt goes: 'upload' only while receipt uploads are open
+   * (PM), otherwise 'whatsapp' (worker/settings/features.ts).
+   */
+  readonly receiptChannel: ReceiptChannel
   readonly appBaseUrl: string | undefined
 }
 
@@ -69,11 +86,38 @@ const reminderHeadingByKind: Readonly<Record<HoldReminderKind, string>> = {
   hold_reminder_6h: 'تنتهي مهلة حجزكِ قريبًا',
 }
 
-const owedStepCopy: Readonly<Record<HoldOwedStep, string>> = {
-  terms_and_receipt:
-    'لتأكيد التاريخ نهائيًا، وافقي على شروط الحجز وارفعي إيصال تحويل العربون من صفحة حجوزاتي قبل انتهاء المهلة.',
-  new_receipt:
-    'لتأكيد التاريخ نهائيًا، ارفعي إيصالًا جديدًا لتحويل العربون من صفحة حجوزاتي قبل انتهاء المهلة.',
+/** Accepting the terms comes first, whatever the receipt channel. */
+const ACCEPT_TERMS_COPY =
+  'لتأكيد التاريخ نهائيًا، وافقي على شروط الحجز من صفحة حجوزاتي قبل انتهاء المهلة، ثم أكملي خطوة العربون كما تظهر لكِ هناك.'
+
+const receiptStepCopy: Readonly<
+  Record<Exclude<HoldOwedStep, 'accept_terms'>, Readonly<Record<ReceiptChannel, string>>>
+> = {
+  deposit_receipt: {
+    whatsapp:
+      'لتأكيد التاريخ نهائيًا، حوّلي العربون ثم أرسلي إيصال التحويل عبر واتساب من زر الإرسال في صفحة حجوزاتي قبل انتهاء المهلة؛ تجدين تفاصيل التحويل في الصفحة نفسها.',
+    upload:
+      'لتأكيد التاريخ نهائيًا، حوّلي العربون ثم ارفعي إيصال التحويل من صفحة حجوزاتي قبل انتهاء المهلة؛ تجدين تفاصيل التحويل في الصفحة نفسها.',
+  },
+  new_receipt: {
+    whatsapp:
+      'لتأكيد التاريخ نهائيًا، أرسلي إيصالًا جديدًا لتحويل العربون عبر واتساب من زر الإرسال في صفحة حجوزاتي قبل انتهاء المهلة.',
+    upload:
+      'لتأكيد التاريخ نهائيًا، ارفعي إيصالًا جديدًا لتحويل العربون من صفحة حجوزاتي قبل انتهاء المهلة.',
+  },
+}
+
+/**
+ * The sentence that tells her what to do next: accept the terms; transfer
+ * and send the receipt on WhatsApp; or upload the receipt (plan 11 W2-03).
+ */
+export function holdOwedStepCopy(
+  owedStep: HoldOwedStep,
+  receiptChannel: ReceiptChannel,
+): string {
+  return owedStep === 'accept_terms'
+    ? ACCEPT_TERMS_COPY
+    : receiptStepCopy[owedStep][receiptChannel]
 }
 
 const reminderConsequenceByKind: Readonly<Record<HoldReminderKind, string>> = {
@@ -92,8 +136,9 @@ export function sanitizeFirstName(value: string): string {
   return sanitizePersonName(value, MAXIMUM_FIRST_NAME_LENGTH)
 }
 
+/** «أهلًا <name>،» with the name bidi-isolated, or «أهلًا،» when it is blank. */
 function greeting(firstName: string): string {
-  const name = sanitizeFirstName(firstName)
+  const name = isolatePersonName(sanitizeFirstName(firstName))
 
   return name.length > 0 ? `أهلًا ${name}،` : 'أهلًا،'
 }
@@ -126,7 +171,7 @@ export function renderHoldReminderEmail(
   const intro = `${greeting(input.customerFirstName)} تبقّى وقت محدود لإكمال حجزكِ قبل انتهاء المهلة.`
   const eventDate = formatEmailDate(input.eventDate)
   const deepLink = buildMyBookingDeepLinkUrl(input.appBaseUrl, input.bookingId)
-  const body = `${owedStepCopy[input.owedStep]} ${reminderConsequenceByKind[input.kind]}`
+  const body = `${holdOwedStepCopy(input.owedStep, input.receiptChannel)} ${reminderConsequenceByKind[input.kind]}`
   const text = [
     BRAND_NAME,
     '',

@@ -8,14 +8,17 @@ import type {
 import { RIYADH_TIME_ZONE, isValidDateKey, parseInstant } from '../shared/timing.js'
 
 /**
- * The shared email layout, formatters and the three existing booking emails.
+ * The shared email layout, formatters, the three existing booking emails and
+ * the flow-2 approval email (plan rev. 2 B1 #5).
  *
  * Every email (the existing direct ones and the outbox emails in
  * worker/emails/*) goes through renderEmailLayout(), so the Resend design
  * stays one design. Left-to-right tokens (phone numbers, email addresses,
- * booking references) are bidi-isolated in the HTML and in the plain text,
- * so `+966…` never renders as `…966+` inside Arabic text (inspection
- * defect #16).
+ * booking references) are bidi-isolated in the subject, the HTML and the
+ * plain text, so `+966…` never renders as `…966+` inside Arabic text
+ * (inspection defect #16); names, deadlines and amounts are isolated too
+ * (TM-12, SB-6). No email ever carries bank details: they are shown only on
+ * the booking page, to the booking's owner (W2-13).
  */
 
 export const BRAND_NAME = 'المصورة سندس يار'
@@ -78,6 +81,14 @@ const statusCopyByStatus: Readonly<Record<BookingStatus, StatusCopy>> = {
 }
 
 const sarFormatter = new Intl.NumberFormat('ar-SA', {
+  style: 'currency',
+  currency: 'SAR',
+  maximumFractionDigits: 0,
+})
+
+// Western digits (03-design-system §2.3): the deposit is an amount she
+// transfers, so it reads exactly as on the booking page (hub-model.ts).
+const depositFormatter = new Intl.NumberFormat('ar-SA-u-nu-latn', {
   style: 'currency',
   currency: 'SAR',
   maximumFractionDigits: 0,
@@ -210,6 +221,16 @@ function customerGreeting(firstName: string): string {
  */
 export function isolateLtrText(value: string): string {
   return `${LEFT_TO_RIGHT_ISOLATE}${stripBidiControls(value)}${POP_DIRECTIONAL_ISOLATE}`
+}
+
+/**
+ * Text this module formatted itself (a Riyadh deadline, an amount) wrapped in
+ * FIRST STRONG ISOLATE … POP DIRECTIONAL ISOLATE, so its digits and marks
+ * cannot re-order the Arabic sentence around it. Not for user input: the
+ * value is trusted formatter output, whose own marks stay inside the isolate.
+ */
+function isolateFormattedText(value: string): string {
+  return `${FIRST_STRONG_ISOLATE}${value}${POP_DIRECTIONAL_ISOLATE}`
 }
 
 /**
@@ -455,7 +476,7 @@ export function renderAdminNewBookingTemplate(
     isolatePersonName(input.customerFirstName, input.customerLastName) ||
     NAME_UNAVAILABLE_LABEL
   const total = formatTotal(input.finalTotal)
-  const subject = `طلب حجز جديد — ${input.bookingReference}`
+  const subject = `طلب حجز جديد — ${isolateLtrText(input.bookingReference)}`
   const text = [
     BRAND_NAME,
     '',
@@ -503,7 +524,7 @@ export function renderCustomerBookingReceivedTemplate(
   input: CustomerBookingReceivedNotification,
 ): EmailTemplate {
   const total = formatTotal(input.finalTotal)
-  const subject = `تم استلام طلب حجزك — ${input.bookingReference}`
+  const subject = `تم استلام طلب حجزك — ${isolateLtrText(input.bookingReference)}`
   const notice =
     'تم استلام طلبكِ وهو قيد المراجعة. لا يُعد التاريخ مؤكدًا حتى تتم الموافقة واستلام العربون.'
   const text = [
@@ -547,7 +568,7 @@ export function renderCustomerBookingStatusTemplate(
 ): EmailTemplate {
   const previousStatus = statusCopyByStatus[input.previousStatus]
   const newStatus = statusCopyByStatus[input.newStatus]
-  const subject = `تحديث طلب الحجز — ${input.bookingReference}`
+  const subject = `تحديث طلب الحجز — ${isolateLtrText(input.bookingReference)}`
   const text = [
     BRAND_NAME,
     '',
@@ -582,6 +603,97 @@ export function renderCustomerBookingStatusTemplate(
       body: newStatus.message,
       actionUrl: input.myBookingsUrl,
       actionLabel: 'فتح حجوزاتي',
+    }),
+  }
+}
+
+/**
+ * The flow-2 approval email (B1 #5): what the status email says when an
+ * approval opens the online confirmation. Built by the caller from the
+ * approved row's own snapshot, never from request input.
+ */
+export interface CustomerFlowTwoApprovalNotification {
+  readonly customerFirstName: string
+  /** booking_requests.id, which is also the booking reference she sees. */
+  readonly bookingReference: string
+  /** Riyadh calendar date, `YYYY-MM-DD`. */
+  readonly eventDate: string
+  /** booking_requests.hold_expires_at, an ISO instant. */
+  readonly holdExpiresAt: string
+  /** booking_requests.deposit_amount, whole riyals. */
+  readonly depositAmount: number
+  readonly myBookingsUrl: string
+}
+
+const FLOW_TWO_APPROVAL_HEADING = 'تم قبول طلبكِ وحجز التاريخ مبدئيًا'
+const FLOW_TWO_APPROVAL_BODY =
+  'لتأكيد التاريخ نهائيًا، أكملي الخطوات من صفحة حجوزاتي قبل انتهاء المهلة: الموافقة على شروط الحجز ثم تحويل العربون. تفاصيل التحويل تظهر لكِ في صفحة حجوزاتي فقط، ولا نرسلها عبر البريد الإلكتروني. إذا انتهت المهلة دون إكمال الخطوات، قد يُلغى الحجز المبدئي ويصبح التاريخ متاحًا للطلبات الأخرى.'
+
+/**
+ * The status email for a flow-2 approval: the deadline in Riyadh time, the
+ * deposit amount and that the steps continue on the bookings page. It never
+ * carries bank details (they stay on the booking page, W2-13). Null when
+ * the deadline is not a usable instant or the deposit is not a positive
+ * whole amount; the caller then sends no email rather than a wrong one.
+ * Flow-1 approvals keep renderCustomerBookingStatusTemplate unchanged.
+ */
+export function renderCustomerFlowTwoApprovalTemplate(
+  input: CustomerFlowTwoApprovalNotification,
+): EmailTemplate | null {
+  const deadline = formatEmailInstant(input.holdExpiresAt)
+
+  if (
+    deadline === null ||
+    !Number.isSafeInteger(input.depositAmount) ||
+    input.depositAmount <= 0
+  ) {
+    return null
+  }
+
+  const isolatedDeadline = isolateFormattedText(deadline)
+  const deposit = isolateFormattedText(
+    depositFormatter.format(input.depositAmount),
+  )
+  const eventDate = formatEmailDate(input.eventDate)
+  const status = statusCopyByStatus.approved_hold.label
+  const intro = `${customerGreeting(input.customerFirstName)} تم قبول طلب حجزكِ، وحجزنا لكِ التاريخ مبدئيًا حتى ${isolatedDeadline}.`
+  const subject = `${FLOW_TWO_APPROVAL_HEADING} — ${isolateLtrText(input.bookingReference)}`
+  const text = [
+    BRAND_NAME,
+    '',
+    intro,
+    '',
+    `رقم الطلب: ${isolateLtrText(input.bookingReference)}`,
+    `تاريخ المناسبة: ${eventDate}`,
+    `الحالة الحالية: ${status}`,
+    `مبلغ العربون: ${deposit}`,
+    `تنتهي المهلة في: ${isolatedDeadline}`,
+    '',
+    FLOW_TWO_APPROVAL_BODY,
+    '',
+    'أكملي الخطوات من صفحة حجوزاتي:',
+    plainTextLink(input.myBookingsUrl),
+    '',
+    WHATSAPP_NOTE,
+  ].join('\n')
+
+  return {
+    subject,
+    text,
+    html: renderEmailLayout({
+      heading: FLOW_TWO_APPROVAL_HEADING,
+      intro,
+      summaryRows: [
+        ['رقم الطلب', ltrValue(input.bookingReference)],
+        ['تاريخ المناسبة', eventDate],
+        ['الحالة الحالية', status],
+        ['مبلغ العربون', deposit],
+        ['تنتهي المهلة في', isolatedDeadline],
+      ],
+      body: FLOW_TWO_APPROVAL_BODY,
+      actionUrl: input.myBookingsUrl,
+      actionLabel: 'فتح حجوزاتي',
+      linkFallbackLabel: 'إذا لم يعمل الزر، افتحي الرابط:',
     }),
   }
 }

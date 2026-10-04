@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   maxQuantityFor,
   type BookingSelectionInput,
-  type NormalizedBookingSelection,
 } from '../../shared/booking'
 import {
   createBookingRequest,
@@ -12,7 +11,6 @@ import {
 import { useAuth } from '../auth/auth-context'
 import {
   albumBoxOptions,
-  coverageAddonOptions,
   albumSizes,
   calculateMagazineUnitPrice,
   coverageOptions,
@@ -27,7 +25,6 @@ import {
   type AlbumBoxId,
   type AlbumPageCount,
   type AlbumSizeId,
-  type CoverageAddonId,
   type CoverageId,
   type MagazinePageCount,
   type PhotoCount,
@@ -82,7 +79,7 @@ const magazinePageOptions = [
   label: string
 }[]
 
-type PackageSelections = NormalizedBookingSelection
+type PackageSelections = BookingSelectionInput
 
 // Per-item ceilings (audit SEC-09): the one table in shared/booking.ts, the
 // same numbers the Worker enforces. Larger orders go through WhatsApp.
@@ -101,7 +98,6 @@ interface CalculatedAmounts {
   magazineUnitPrice: number
   magazineSubtotal: number
   woodenEnlargementSubtotal: number
-  coverageAddonsSubtotal: number
   estimatedTotal: number
 }
 
@@ -160,8 +156,6 @@ function createDefaultSelections(): PackageSelections {
     magazineQuantity: 0,
     magazinePageCount: 1,
     woodenEnlargementQuantity: 0,
-    mobileCoverage: false,
-    secondCamera: false,
   }
 }
 
@@ -180,15 +174,6 @@ function isNonNegativeInteger(value: unknown): value is number {
 /** A draft saved before the ceilings existed is brought within them. */
 function clampQuantity(value: number, maximum: number): number {
   return Math.min(value, maximum)
-}
-
-function isAddonSelected(
-  selections: PackageSelections,
-  addonId: CoverageAddonId,
-): boolean {
-  return addonId === 'mobile-bts'
-    ? selections.mobileCoverage
-    : selections.secondCamera
 }
 
 function isWithinQuantityLimits(selections: PackageSelections): boolean {
@@ -313,8 +298,6 @@ function loadSavedSelections(): PackageSelections {
         selections.woodenEnlargementQuantity,
         MAXIMUM_WOODEN_ENLARGEMENT_QUANTITY,
       ),
-      mobileCoverage: selections.mobileCoverage === true,
-      secondCamera: selections.secondCamera === true,
     }
   } catch (error: unknown) {
     // A corrupt draft (SyntaxError) or blocked storage (DOMException) just
@@ -463,8 +446,6 @@ function createNormalizedBookingSelection(
     magazineQuantity: selections.magazineQuantity,
     magazinePageCount: selections.magazinePageCount,
     woodenEnlargementQuantity: selections.woodenEnlargementQuantity,
-    mobileCoverage: selections.mobileCoverage,
-    secondCamera: selections.secondCamera,
   }
 }
 
@@ -704,13 +685,6 @@ export default function PackageConfigurator() {
     const woodenEnlargementSubtotal =
       selections.woodenEnlargementQuantity *
       woodenEnlargementPricing.unitPrice
-    const coverageAddonsSubtotal = coverageAddonOptions.reduce(
-      (subtotal, option) =>
-        isAddonSelected(selections, option.id)
-          ? subtotal + option.price
-          : subtotal,
-      0,
-    )
 
     return {
       coveragePrice,
@@ -720,10 +694,8 @@ export default function PackageConfigurator() {
       magazineUnitPrice,
       magazineSubtotal,
       woodenEnlargementSubtotal,
-      coverageAddonsSubtotal,
       estimatedTotal:
         coveragePrice +
-        coverageAddonsSubtotal +
         albumPrice +
         albumBoxPrice +
         individualPrintsSubtotal +
@@ -745,11 +717,6 @@ export default function PackageConfigurator() {
     selections.photoCount,
   )
   const reviewExtras = [
-    ...coverageAddonOptions.flatMap((option) =>
-      isAddonSelected(selections, option.id)
-        ? [`${option.label} (${formatCurrency(option.price)})`]
-        : [],
-    ),
     ...printSizeOptions.flatMap((option) => {
       const quantity = selections.printQuantities[option.id]
 
@@ -1214,61 +1181,6 @@ export default function PackageConfigurator() {
                             className="configurator__choice-state-icon"
                           />
                           اختياركِ
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-
-                <p className="configurator__help">
-                  إضافات اختيارية على التغطية:
-                </p>
-                <div className="configurator__choice-grid">
-                  {coverageAddonOptions.map((option) => {
-                    const isSelected = isAddonSelected(selections, option.id)
-
-                    return (
-                      <label
-                        className={`configurator__choice${
-                          isSelected ? ' configurator__choice--selected' : ''
-                        }`}
-                        key={option.id}
-                      >
-                        <input
-                          className="configurator__choice-input"
-                          type="checkbox"
-                          name={`addon-${option.id}`}
-                          checked={isSelected}
-                          onChange={(event) => {
-                            const checked = event.target.checked
-
-                            updateSelections((current) =>
-                              option.id === 'mobile-bts'
-                                ? { ...current, mobileCoverage: checked }
-                                : { ...current, secondCamera: checked },
-                            )
-                          }}
-                        />
-                        <span className="configurator__choice-content">
-                          <strong className="configurator__choice-title">
-                            {option.label}
-                          </strong>
-                          <span className="configurator__help">
-                            {option.description}
-                          </span>
-                          <span className="configurator__choice-price">
-                            {`+ ${formatCurrency(option.price)}`}
-                          </span>
-                        </span>
-                        <span
-                          className="configurator__choice-state"
-                          aria-hidden="true"
-                        >
-                          <Icon
-                            name="check"
-                            className="configurator__choice-state-icon"
-                          />
-                          مضافة
                         </span>
                       </label>
                     )
@@ -1747,15 +1659,6 @@ export default function PackageConfigurator() {
                   </dt>
                   <dd>{formatCurrency(amounts.coveragePrice)}</dd>
                 </div>
-
-                {coverageAddonOptions.map((option) =>
-                  isAddonSelected(selections, option.id) ? (
-                    <div key={option.id}>
-                      <dt>{option.label}</dt>
-                      <dd>{formatCurrency(option.price)}</dd>
-                    </div>
-                  ) : null,
-                )}
 
                 {selections.albumEnabled && amounts.albumPrice > 0 && (
                   <div>

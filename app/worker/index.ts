@@ -3,6 +3,7 @@ import {
   handleCreateBooking,
   handleMyBookings,
 } from './bookings.js'
+import { handleCspReport } from './csp-report.js'
 import {
   errorResponse,
   jsonResponse,
@@ -17,21 +18,49 @@ import {
   isPortalPath,
 } from './portal/portal-routes.js'
 import { handleProfile } from './profile.js'
+import {
+  connectingIpKey,
+  limitBurst,
+  rateLimitedResponse,
+} from './rate-limit.js'
 import { runScheduledTick } from './scheduled.js'
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 const MAXIMUM_RANGE_DAYS = 93
 const ENABLED_VALUE = 'on'
+const AVAILABILITY_PATH = '/api/availability'
+const CSP_REPORT_PATH = '/api/csp-report'
+
+/**
+ * GET /api/availability is public and the same for every visitor, so it is
+ * cached at the edge for 60 s (plan 11 §3.2 #48, TM-11): repeated calendar
+ * views reach D1 at most once a minute per range and data centre.
+ */
+const AVAILABILITY_CACHE_CONTROL = 'public, max-age=60'
+/**
+ * Every Worker response of the browse-only preview (C-8). Its static pages
+ * get the same header from public/_headers, which never applies to /api.
+ */
+const PREVIEW_ROBOTS_TAG = 'noindex, nofollow'
 
 /**
  * The only API reads a browse-only preview serves (audit SEC-08): both are
  * public and unauthenticated. Every other /api request, including every
- * authenticated GET, answers 403 PREVIEW_READ_ONLY there.
+ * authenticated GET, answers 403 PREVIEW_READ_ONLY there. This is stricter
+ * than plan 11 §3.1 (every non-GET), on purpose: the preview has no
+ * accounts to read.
  */
 const previewReadablePaths: ReadonlySet<string> = new Set([
   '/api/health',
-  '/api/availability',
+  AVAILABILITY_PATH,
 ])
+
+/**
+ * The only API write the preview accepts (plan 11 §3.1, C-8): CSP violation
+ * counts, so the enforced-policy trial (W5-05) can run there. It is public,
+ * bounded and stores no personal data (worker/csp-report.ts).
+ */
+const previewWritablePaths: ReadonlySet<string> = new Set([CSP_REPORT_PATH])
 
 type PublicDateStatus = 'pending' | 'unavailable'
 
@@ -91,7 +120,27 @@ function isApiPath(pathname: string): boolean {
 }
 
 function isAllowedInPreview(request: Request, url: URL): boolean {
-  return request.method === 'GET' && previewReadablePaths.has(url.pathname)
+  if (request.method === 'GET') {
+    return previewReadablePaths.has(url.pathname)
+  }
+
+  return request.method === 'POST' && previewWritablePaths.has(url.pathname)
+}
+
+/**
+ * The response with X-Robots-Tag added (C-8), copied because a response
+ * from the Cache API or fetch has immutable headers.
+ */
+function withPreviewHeaders(response: Response): Response {
+  const headers = new Headers(response.headers)
+
+  headers.set('X-Robots-Tag', PREVIEW_ROBOTS_TAG)
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
 }
 
 function previewReadOnlyResponse(): Response {
@@ -114,13 +163,75 @@ function handleHealth(request: Request): Response {
   })
 }
 
+/**
+ * The edge-cache key of one availability range: this origin's path with the
+ * validated `from` and `to` only. No other query parameter, header or cookie
+ * of the request enters it, so a key never carries a visitor's data and
+ * extra parameters cannot split the cache into fresh D1 reads.
+ */
+function availabilityCacheKey(url: URL, from: string, to: string): Request {
+  const key = new URL(AVAILABILITY_PATH, url.origin)
+
+  key.searchParams.set('from', from)
+  key.searchParams.set('to', to)
+
+  return new Request(key.toString(), { method: 'GET' })
+}
+
+/**
+ * The cached answer for the key, if any. The cache is an optimisation: when
+ * it cannot be read the request goes to D1 and only a fixed code is logged.
+ */
+async function readCachedAvailability(
+  key: Request,
+): Promise<Response | undefined> {
+  try {
+    return await caches.default.match(key)
+  } catch (error) {
+    if (error instanceof Error) {
+      console.warn('AVAILABILITY_CACHE_SKIPPED code=CACHE_READ_FAILED')
+
+      return undefined
+    }
+
+    throw error
+  }
+}
+
+async function storeAvailability(
+  key: Request,
+  response: Response,
+): Promise<void> {
+  try {
+    await caches.default.put(key, response)
+  } catch (error) {
+    if (error instanceof Error) {
+      console.warn('AVAILABILITY_CACHE_SKIPPED code=CACHE_WRITE_FAILED')
+
+      return
+    }
+
+    throw error
+  }
+}
+
 async function handleAvailability(
   request: Request,
   env: Env,
   url: URL,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   if (request.method !== 'GET') {
     return methodNotAllowedResponse(['GET'])
+  }
+
+  // Before the cache, so the per-IP burst holds for cached answers too
+  // (plan 11 §3.1 RL_AVAILABILITY, TM-11).
+  if (
+    (await limitBurst(env.RL_AVAILABILITY, connectingIpKey(request))) ===
+    'limited'
+  ) {
+    return rateLimitedResponse()
   }
 
   const from = url.searchParams.get('from')
@@ -165,6 +276,13 @@ async function handleAvailability(
       'DATE_RANGE_TOO_LARGE',
       'يجب ألا تتجاوز المدة المطلوبة 93 يومًا شاملة تاريخي البداية والنهاية.',
     )
+  }
+
+  const cacheKey = availabilityCacheKey(url, from, to)
+  const cached = await readCachedAvailability(cacheKey)
+
+  if (cached) {
+    return cached
   }
 
   const blockedDatesStatement = env.DB.prepare(
@@ -243,7 +361,7 @@ async function handleAvailability(
       status,
     }))
 
-  return jsonResponse({
+  const response = jsonResponse({
     ok: true,
     range: {
       from,
@@ -251,6 +369,112 @@ async function handleAvailability(
     },
     dates,
   })
+
+  // Only a successful answer is cached; every error above stays no-store.
+  response.headers.set('Cache-Control', AVAILABILITY_CACHE_CONTROL)
+  ctx.waitUntil(storeAvailability(cacheKey, response.clone()))
+
+  return response
+}
+
+async function routeRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  let url: URL
+
+  try {
+    url = new URL(request.url)
+  } catch (error) {
+    if (!(error instanceof TypeError)) {
+      throw error
+    }
+
+    return errorResponse(
+      400,
+      'INVALID_REQUEST_URL',
+      'تعذر قراءة عنوان الطلب.',
+    )
+  }
+
+  try {
+    // Before any routing, so no authenticated or writing handler can run
+    // in the browse-only preview.
+    if (
+      isPreviewReadOnly(env) &&
+      isApiPath(url.pathname) &&
+      !isAllowedInPreview(request, url)
+    ) {
+      return previewReadOnlyResponse()
+    }
+
+    if (url.pathname === '/api/health') {
+      return handleHealth(request)
+    }
+
+    if (url.pathname === AVAILABILITY_PATH) {
+      return await handleAvailability(request, env, url, ctx)
+    }
+
+    if (url.pathname === CSP_REPORT_PATH) {
+      return await handleCspReport(request, env)
+    }
+
+    // Admin portal namespaces (receipts, gallery, album, handover, slots,
+    // queue) go to their own registry, guarded by the same admin check,
+    // before the generic /api/admin branch. Legacy admin paths never match.
+    if (isAdminPortalPath(url.pathname)) {
+      return await handleAdminPortalRequest(request, env, url, ctx)
+    }
+
+    if (
+      url.pathname === '/api/admin' ||
+      url.pathname.startsWith('/api/admin/')
+    ) {
+      return await handleAdminRequest(request, env, url, ctx)
+    }
+
+    if (url.pathname === '/api/profile') {
+      return await handleProfile(request, env)
+    }
+
+    if (url.pathname === '/api/bookings') {
+      return await handleCreateBooking(request, env, ctx)
+    }
+
+    if (url.pathname === '/api/bookings/me') {
+      return await handleMyBookings(request, env)
+    }
+
+    // /api/bookings/{bookingId}/... and /api/media/... (gated, see
+    // portal/gates.ts).
+    if (isPortalPath(url.pathname)) {
+      return await handlePortalRequest(request, env, url, ctx)
+    }
+
+    if (isApiPath(url.pathname)) {
+      return errorResponse(
+        404,
+        'NOT_FOUND',
+        'مسار API غير موجود.',
+      )
+    }
+
+    return errorResponse(
+      404,
+      'NOT_FOUND',
+      'المسار غير موجود.',
+    )
+  } catch {
+    console.error('Worker request failed.')
+
+    return errorResponse(
+      500,
+      'INTERNAL_ERROR',
+      'حدث خطأ غير متوقع. يرجى المحاولة لاحقًا.',
+    )
+  }
 }
 
 export default {
@@ -259,95 +483,9 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ): Promise<Response> {
-    let url: URL
+    const response = await routeRequest(request, env, ctx)
 
-    try {
-      url = new URL(request.url)
-    } catch (error) {
-      if (!(error instanceof TypeError)) {
-        throw error
-      }
-
-      return errorResponse(
-        400,
-        'INVALID_REQUEST_URL',
-        'تعذر قراءة عنوان الطلب.',
-      )
-    }
-
-    try {
-      // Before any routing, so no authenticated or writing handler can run
-      // in the browse-only preview.
-      if (
-        isPreviewReadOnly(env) &&
-        isApiPath(url.pathname) &&
-        !isAllowedInPreview(request, url)
-      ) {
-        return previewReadOnlyResponse()
-      }
-
-      if (url.pathname === '/api/health') {
-        return handleHealth(request)
-      }
-
-      if (url.pathname === '/api/availability') {
-        return await handleAvailability(request, env, url)
-      }
-
-      // Admin portal namespaces (receipts, gallery, album, handover, slots,
-      // queue) go to their own registry, guarded by the same admin check,
-      // before the generic /api/admin branch. Legacy admin paths never match.
-      if (isAdminPortalPath(url.pathname)) {
-        return await handleAdminPortalRequest(request, env, url, ctx)
-      }
-
-      if (
-        url.pathname === '/api/admin' ||
-        url.pathname.startsWith('/api/admin/')
-      ) {
-        return await handleAdminRequest(request, env, url, ctx)
-      }
-
-      if (url.pathname === '/api/profile') {
-        return await handleProfile(request, env)
-      }
-
-      if (url.pathname === '/api/bookings') {
-        return await handleCreateBooking(request, env, ctx)
-      }
-
-      if (url.pathname === '/api/bookings/me') {
-        return await handleMyBookings(request, env)
-      }
-
-      // /api/bookings/{bookingId}/... and /api/media/... (gated, see
-      // portal/gates.ts).
-      if (isPortalPath(url.pathname)) {
-        return await handlePortalRequest(request, env, url, ctx)
-      }
-
-      if (isApiPath(url.pathname)) {
-        return errorResponse(
-          404,
-          'NOT_FOUND',
-          'مسار API غير موجود.',
-        )
-      }
-
-      return errorResponse(
-        404,
-        'NOT_FOUND',
-        'المسار غير موجود.',
-      )
-    } catch {
-      console.error('Worker request failed.')
-
-      return errorResponse(
-        500,
-        'INTERNAL_ERROR',
-        'حدث خطأ غير متوقع. يرجى المحاولة لاحقًا.',
-      )
-    }
+    return isPreviewReadOnly(env) ? withPreviewHeaders(response) : response
   },
 
   async scheduled(

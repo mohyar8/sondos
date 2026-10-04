@@ -5,7 +5,6 @@ import {
   BOOKING_REQUEST_HREF,
   type NavigationHandler,
 } from '../../layout/navigation'
-import DisplayHeading from '../../components/DisplayHeading'
 
 interface HeroSectionProps {
   onNavigate: NavigationHandler
@@ -36,7 +35,9 @@ export default function HeroSection({ onNavigate }: HeroSectionProps) {
       <div className="home-hero__layout container">
         <div className="home-hero__content">
           <p className="eyebrow">تصوير عرائس في المدينة المنورة</p>
-          <DisplayHeading as="h1" id="home-hero-title" className="home-hero__title" text="يومكِ لكِ وحدكِ، وصوركِ لا تُنشر إلا بإذنكِ" />
+          <h1 id="home-hero-title" className="home-hero__title">
+            يومكِ لكِ وحدكِ، وصوركِ لا تُنشر إلا بإذنكِ
+          </h1>
           <p className="home-hero__lead">
             نوثّق تفاصيل يومكِ بأسلوب هادئ وأنيق، لتبقى الصور ذكرى صادقة
             تعودين إليها في كل مرة.

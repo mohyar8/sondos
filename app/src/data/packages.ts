@@ -16,52 +16,27 @@ export const coverageOptions = [
     id: 'two-hours',
     durationHours: 2,
     label: 'ساعتان',
-    price: 1450,
+    price: 1600,
   },
   {
     id: 'four-hours',
     durationHours: 4,
     label: '4 ساعات',
-    price: 3000,
+    price: 3200,
   },
   {
     id: 'six-hours',
     durationHours: 6,
     label: '6 ساعات',
-    price: 4500,
+    price: 4800,
   },
   {
     id: 'eight-hours',
     durationHours: 8,
     label: '8 ساعات',
-    price: 6100,
+    price: 6400,
   },
 ] as const satisfies readonly CoverageOption[]
-
-export type CoverageAddonId = 'mobile-bts' | 'second-camera'
-
-export interface CoverageAddonOption {
-  readonly id: CoverageAddonId
-  readonly label: string
-  readonly description: string
-  readonly price: number
-}
-
-/** Optional additions to any coverage duration (owner, 2026-10-01). */
-export const coverageAddonOptions = [
-  {
-    id: 'mobile-bts',
-    label: 'تصوير بالجوال',
-    description: 'كواليس عفوية للعروسين تصلكِ يوم المناسبة نفسه عبر AirDrop.',
-    price: 200,
-  },
-  {
-    id: 'second-camera',
-    label: 'كاميرا إضافية',
-    description: 'تصوير بكاميرا ثانية لتوثيق يومكِ من زاويتين.',
-    price: 500,
-  },
-] as const satisfies readonly CoverageAddonOption[]
 
 export type AlbumPageCount = 10 | 15 | 20
 export type AlbumSizeId = 'small' | 'medium' | 'large'

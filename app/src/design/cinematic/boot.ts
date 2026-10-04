@@ -13,17 +13,5 @@
 import './tokens.css'
 import './hero.css'
 import './scroll.css'
-import './extras.css'
-import { brandIntroLogo } from '../../data/brand-images'
-import { playIntroOnce } from './intro'
 
 document.documentElement.setAttribute('data-design', 'cinematic')
-
-// The gold reading-progress line (extras.css §5). Outside React's tree, so
-// the router never touches it; decorative, so hidden from assistive tech.
-const progressLine = document.createElement('div')
-progressLine.className = 'cine-progress'
-progressLine.setAttribute('aria-hidden', 'true')
-document.body.append(progressLine)
-
-playIntroOnce(brandIntroLogo.webp448)

@@ -8,11 +8,21 @@ import {
   type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
-import type {
-  AdminBookingAction,
-  AdminBookingDetail,
-  BookingStatus,
+import {
+  DEFAULT_EXTEND_HOURS,
+  MAXIMUM_EXTEND_HOURS,
+  MINIMUM_EXTEND_HOURS,
+  MINIMUM_OFFLINE_NOTE_CODE_POINTS,
+  isFlowTwoOnlyAdminAction,
+  type AdminApprovalPreview,
+  type AdminApprovalUnavailableReason,
+  type AdminBookingAction,
+  type AdminBookingActionRequest,
+  type AdminBookingDetail,
+  type AdminFlowVersion,
+  type BookingStatus,
 } from '../../shared/admin'
+import { countCodePoints } from '../../shared/text'
 import {
   ADMIN_MFA_REQUIRED_CODE,
   ADMIN_MFA_REQUIRED_MESSAGE,
@@ -26,6 +36,8 @@ import { useAuth } from '../auth/auth-context'
 import AdminIcon from '../features/admin-portal/AdminIcon'
 import {
   formatAdminCalendarDate,
+  formatAdminCurrency,
+  formatAdminTimestamp,
   formatCustomerName,
   formatCustomerText,
 } from '../features/admin-portal/format'
@@ -34,6 +46,7 @@ import {
   useMediaQuery,
 } from '../features/admin-portal/use-media-query'
 import { WhatsAppIcon } from '../layout/icons'
+import { toAsciiDigits } from '../lib/ascii-digits'
 import { isTopmostModal } from '../lib/modal-stack'
 import { getRiyadhToday, listenForPageReturn } from '../lib/riyadh-calendar'
 import {
@@ -82,10 +95,39 @@ interface ActionFeedback extends FeedbackMessage {
   customerNotEmailed: boolean
 }
 
+/** What the admin typed into the dialog's fields, as typed (#18). */
+interface ActionInputs {
+  note: string
+  extendHours: string
+  depositAmount: string
+}
+
+/** One message per field, null when the field is fine; text, never colour. */
+interface ActionFieldErrors {
+  note: string | null
+  extendHours: string | null
+  depositAmount: string | null
+}
+
+type ParsedActionInputs =
+  | {
+      ok: true
+      request: AdminBookingActionRequest
+    }
+  | {
+      ok: false
+      errors: ActionFieldErrors
+    }
+
 interface ActionConfirmationDialogProps {
   action: AdminBookingAction
   booking: AdminBookingDetail
-  note: string
+  flowVersion: AdminFlowVersion
+  inputs: ActionInputs
+  /** Shown after a refused attempt; every value null before that. */
+  fieldErrors: ActionFieldErrors
+  /** Incremented on every refused attempt: focus moves to the first error. */
+  invalidAttempt: number
   errorMessage: string | null
   isSubmitting: boolean
   isActionStillAllowed: boolean
@@ -94,13 +136,15 @@ interface ActionConfirmationDialogProps {
   opener: HTMLButtonElement | null
   /** Receives focus when the opener no longer exists after the dialog closes. */
   fallbackFocusRef: RefObject<HTMLElement | null>
-  onNoteChange: (value: string) => void
+  onInputChange: (field: keyof ActionInputs, value: string) => void
   onConfirm: () => void
   onCancel: () => void
 }
 
 const MAXIMUM_TRANSITION_NOTE_LENGTH = 500
 const MAXIMUM_ADMIN_NOTES_LENGTH = 2_000
+/** A whole riyal amount or an hour count, as digits (UX-07). */
+const MAXIMUM_NUMBER_INPUT_LENGTH = 12
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -111,10 +155,22 @@ const FOCUSABLE_SELECTOR = [
 ].join(',')
 
 /** Unicode isolates keep a Latin run (a booking id) whole inside Arabic text. */
-const LEFT_TO_RIGHT_ISOLATE = '\u2066'
+const LEFT_TO_RIGHT_ISOLATE = '⁦'
 /** The same for her name, whichever script it is written in (SEC-10). */
-const FIRST_STRONG_ISOLATE = '\u2068'
-const POP_DIRECTIONAL_ISOLATE = '\u2069'
+const FIRST_STRONG_ISOLATE = '⁨'
+const POP_DIRECTIONAL_ISOLATE = '⁩'
+
+const NO_FIELD_ERRORS: ActionFieldErrors = {
+  note: null,
+  extendHours: null,
+  depositAmount: null,
+}
+
+const EMPTY_INPUTS: ActionInputs = {
+  note: '',
+  extendHours: String(DEFAULT_EXTEND_HOURS),
+  depositAmount: '',
+}
 
 const actionLabels: Record<AdminBookingAction, string> = {
   approve: 'قبول الطلب وحجز التاريخ',
@@ -124,6 +180,10 @@ const actionLabels: Record<AdminBookingAction, string> = {
   request_payment: 'طلب تحويل العربون',
   confirm_payment: 'تأكيد استلام العربون',
   cancel: 'إلغاء الحجز',
+  extend_hold: 'تمديد مهلة الحجز المؤقت',
+  expire_hold: 'إنهاء الحجز المؤقت',
+  reinstate_hold: 'إعادة الحجز المؤقت',
+  confirm_offline: 'تأكيد الحجز يدويًا (الشروط والعربون)',
 }
 
 /**
@@ -148,6 +208,37 @@ const actionDescriptions: Record<AdminBookingAction, string> = {
     'تحققي من وصول التحويل البنكي فعليًا قبل تأكيد الحجز. لا تعتمدي على رسالة العميلة وحدها.',
   cancel:
     'سيؤدي إلغاء الحجز إلى إنهاء الطلب، وقد يصبح التاريخ متاحًا مرة أخرى إذا لم يوجد حجز آخر أو حجب يدوي.',
+  extend_hold:
+    'تمنح العميلة ساعات إضافية لإكمال الموافقة على الشروط وتحويل العربون. تُحسب المهلة الجديدة من المهلة الحالية أو من الآن أيهما أبعد، ولا تتجاوز بداية يوم المناسبة. ستصلها رسالة بالموعد الجديد.',
+  expire_hold:
+    'انتهت مهلة الحجز المؤقت دون إكمال الخطوات. إنهاؤه يحرّر التاريخ للطلبات الأخرى، ويمكن إعادته لاحقًا ما دام التاريخ متاحًا ولم يبدأ يوم المناسبة.',
+  reinstate_hold:
+    'يعيد الحجز المؤقت بمهلة جديدة: 48 ساعة أو حتى بداية يوم المناسبة أيهما أقرب. لا يُقبل إذا كان التاريخ محجوزًا بطلب آخر أو محجوبًا.',
+  confirm_offline:
+    'استخدميه فقط عندما تتعذر على العميلة الموافقة على الشروط وإكمال الخطوات من الموقع. يسجّل موافقتها على النسخة الحالية من الشروط كما أخذتِها منها (عبر واتساب مثلًا)، ويسجّل العربون المستلم، ويؤكد الحجز. يتطلب تسجيل دخول حديثًا وسببًا مكتوبًا.',
+}
+
+/**
+ * TM-20: the amount recorded is the one seen in the bank statement; a
+ * WhatsApp notice, a receipt image or a matching transaction number is not
+ * proof of payment.
+ */
+const BANK_STATEMENT_HINT =
+  'أدخلي المبلغ كما يظهر في كشف حسابكِ البنكي أو تطبيق البنك، بالريال وبدون كسور. إشعار واتساب أو صورة الإيصال أو تطابق رقم العملية ليست إثباتًا للدفع.'
+
+const EXTEND_HOURS_ERROR = `يجب أن تكون ساعات التمديد عددًا صحيحًا بين ${MINIMUM_EXTEND_HOURS} و${MAXIMUM_EXTEND_HOURS}.`
+const OFFLINE_NOTE_ERROR = `اكتبي سبب التأكيد اليدوي (${MINIMUM_OFFLINE_NOTE_CODE_POINTS} أحرف على الأقل).`
+const LOW_AMOUNT_NOTE_ERROR =
+  'المبلغ أقل من العربون المطلوب؛ اكتبي ملاحظة توضّح سبب قبوله.'
+
+/** Why `approve` will take the legacy path (#17 approvalPreview). */
+const approvalUnavailableReasons: Record<AdminApprovalUnavailableReason, string> = {
+  SETTINGS_INCOMPLETE:
+    'إعدادات التأكيد الإلكتروني غير مكتملة (قاعدة العربون أو الحساب البنكي أو شروط الحجز)',
+  SWITCH_OFF: 'التأكيد الإلكتروني متوقف في إعدادات النشر',
+  KILL_SWITCH: 'مفتاح إيقاف التأكيد الإلكتروني مفعّل',
+  EVENT_TOO_SOON: 'موعد المناسبة أقرب من ثلاثة أيام',
+  EVENT_PASSED: 'تاريخ المناسبة قد مضى',
 }
 
 /** Pre-filled, editable WhatsApp text per status; addressed to the bride. */
@@ -171,8 +262,144 @@ const whatsappStageMessages: Record<BookingStatus, string> = {
     'انتهت مهلة طلب الحجز السابق. تواصلي معنا عبر واتساب لمعرفة الخيارات المتاحة.',
 }
 
+/**
+ * 409 codes that mean the row moved under the dialog (another tab, the
+ * cron, a customer step, a settings change): the details and the list are
+ * refreshed so the buttons match the row again. Legacy rows only ever
+ * answer the first (N-29).
+ */
+const STALE_STATE_CODES: ReadonlySet<string> = new Set([
+  'INVALID_STATUS_TRANSITION',
+  'GRACE_PERIOD_OVER',
+  'HOLD_NOT_OVERDUE',
+  'TERMS_NOT_ACCEPTED',
+  'TERMS_ALREADY_ACCEPTED',
+  'DATE_NOT_FREE',
+  'SETTINGS_CHANGED',
+])
+
+/** Reject, cancel and the admin's own expiry end something for her. */
 function isDestructiveAction(action: AdminBookingAction): boolean {
-  return action === 'reject' || action === 'cancel'
+  return action === 'reject' || action === 'cancel' || action === 'expire_hold'
+}
+
+/**
+ * The row's flow. A bundle whose parser predates #17 (src/api/admin.ts
+ * before W3-02) drops `flowVersion`; the action names then prove flow 2
+ * (shared/admin.ts: the flow-2-only actions, and `confirm_payment` on an
+ * approved hold, which the legacy map never offers). A row that proves
+ * nothing is treated as flow 1, whose dialog never asks for an amount.
+ */
+function resolveFlowVersion(booking: AdminBookingDetail): AdminFlowVersion {
+  if (booking.flowVersion !== undefined) {
+    return booking.flowVersion
+  }
+
+  const provesFlowTwo =
+    booking.allowedActions.some(isFlowTwoOnlyAdminAction) ||
+    (booking.status === 'approved_hold' &&
+      booking.allowedActions.includes('confirm_payment'))
+
+  return provesFlowTwo ? 2 : 1
+}
+
+/** `depositAmount` is sent with these (#18); the Worker refuses it elsewhere. */
+function takesDepositAmount(
+  action: AdminBookingAction,
+  flowVersion: AdminFlowVersion,
+): boolean {
+  return (
+    action === 'confirm_offline' ||
+    (action === 'confirm_payment' && flowVersion === 2)
+  )
+}
+
+/** A whole number typed in any digits toAsciiDigits reads (UX-07), or null. */
+function readWholeNumberInput(value: string): number | null {
+  const digits = toAsciiDigits(value.trim())
+
+  return /^[0-9]{1,8}$/.test(digits) ? Number(digits) : null
+}
+
+/**
+ * The request body for the action, or the field errors that stop it. The
+ * same rules the Worker applies (#18, H3, TM-20), so a refused body is
+ * explained next to its field before the request is made: hours 1–168,
+ * the amount 1..the booking's total, a reason of at least ten characters
+ * for the offline confirmation, and a reason whenever less than the
+ * requested deposit is recorded.
+ */
+function parseActionInputs(
+  action: AdminBookingAction,
+  flowVersion: AdminFlowVersion,
+  booking: AdminBookingDetail,
+  inputs: ActionInputs,
+): ParsedActionInputs {
+  const errors: ActionFieldErrors = { ...NO_FIELD_ERRORS }
+  const note = inputs.note.trim()
+  const request: AdminBookingActionRequest = {
+    action,
+    ...(note ? { note } : {}),
+  }
+
+  if (action === 'extend_hold') {
+    const hours = readWholeNumberInput(inputs.extendHours)
+
+    if (
+      hours === null ||
+      hours < MINIMUM_EXTEND_HOURS ||
+      hours > MAXIMUM_EXTEND_HOURS
+    ) {
+      errors.extendHours = EXTEND_HOURS_ERROR
+    } else {
+      request.extendHours = hours
+    }
+  }
+
+  if (takesDepositAmount(action, flowVersion)) {
+    const amount = readWholeNumberInput(inputs.depositAmount)
+
+    if (amount === null || amount < 1 || amount > booking.estimatedTotal) {
+      errors.depositAmount = `يجب إدخال مبلغ العربون المستلم بالريال كعدد صحيح لا يقل عن 1 ولا يتجاوز إجمالي الحجز (${formatAdminCurrency(booking.estimatedTotal)}).`
+    } else {
+      request.depositAmount = amount
+
+      if (
+        action === 'confirm_payment' &&
+        typeof booking.depositAmount === 'number' &&
+        amount < booking.depositAmount &&
+        note.length === 0
+      ) {
+        errors.note = LOW_AMOUNT_NOTE_ERROR
+      }
+    }
+  }
+
+  if (
+    action === 'confirm_offline' &&
+    countCodePoints(note) < MINIMUM_OFFLINE_NOTE_CODE_POINTS
+  ) {
+    errors.note = OFFLINE_NOTE_ERROR
+  }
+
+  return errors.note || errors.extendHours || errors.depositAmount
+    ? { ok: false, errors }
+    : { ok: true, request }
+}
+
+/** What `approve` will do, as the Worker computed it (#17), or nothing known. */
+function describeApprovalPreview(
+  preview: AdminApprovalPreview | null | undefined,
+): string | null {
+  if (preview === undefined || preview === null) {
+    return null
+  }
+
+  if (preview.flowVersion === 2) {
+    return `سيفتح القبول التأكيد الإلكتروني: عربون ${formatAdminCurrency(preview.depositAmount)} ومهلة ${preview.holdHours} ساعة تُكمل خلالها العميلة الموافقة على الشروط وتحويل العربون من الموقع.`
+  }
+
+  return `سيأخذ القبول المسار اليدوي (${approvalUnavailableReasons[preview.reason]}): حجز مؤقت لمدة 24 ساعة ومتابعة العقد والعربون عبر واتساب.`
 }
 
 function normalizeSaudiWhatsAppNumber(phone: string): string | null {
@@ -236,6 +463,8 @@ function getMutationErrorMessage(
       return PAST_EVENT_APPROVAL_MESSAGE
     case 'DATE_UNAVAILABLE':
       return 'تعذر قبول الطلب لأن التاريخ محجوز بطلب آخر أو محجوب يدويًا.'
+    case 'DATE_NOT_FREE':
+      return 'تاريخ المناسبة محجوز بطلب آخر لا يزال ساريًا.'
     case 'INVALID_STATUS_TRANSITION':
       return 'تغيّرت حالة الطلب بالفعل، لذلك سيتم تحديث التفاصيل قبل محاولة إجراء آخر.'
     // NOTES_TOO_LONG is the notes endpoint's code since unit D2; NOTE_TOO_LONG
@@ -245,6 +474,28 @@ function getMutationErrorMessage(
       return operation === 'notes'
         ? 'يجب ألا تتجاوز الملاحظات الداخلية 2000 حرف.'
         : 'يجب ألا تتجاوز ملاحظة الإجراء 500 حرف.'
+    case 'NOTE_REQUIRED':
+      return `هذا الإجراء يتطلب ملاحظة توضّح السبب (${MINIMUM_OFFLINE_NOTE_CODE_POINTS} أحرف على الأقل).`
+    case 'INVALID_TEXT':
+      return 'تحتوي الملاحظة على رموز غير مسموح بها.'
+    case 'CONTENT_NOT_ALLOWED':
+      return 'لا يجوز أن تحتوي الملاحظة على روابط أو أرقام حسابات أو أرقام جوال؛ تعليمات الدفع تُدخل في إعدادات الحساب البنكي فقط.'
+    case 'INVALID_EXTEND_HOURS':
+      return EXTEND_HOURS_ERROR
+    case 'INVALID_AMOUNT':
+      return 'يجب إدخال مبلغ العربون المستلم بالريال كعدد صحيح لا يقل عن 1 ولا يتجاوز إجمالي الحجز.'
+    case 'GRACE_PERIOD_OVER':
+      return 'انقضت فترة السماح بعد انتهاء المهلة، فلم يعد التمديد أو تأكيد العربون ممكنًا لهذا الحجز.'
+    case 'HOLD_BEYOND_EVENT':
+      return 'لا يمكن أن تتجاوز المهلة الجديدة بداية يوم المناسبة. قلّلي عدد الساعات.'
+    case 'HOLD_NOT_OVERDUE':
+      return 'لم تنتهِ مهلة الحجز المؤقت بعد.'
+    case 'TERMS_NOT_ACCEPTED':
+      return 'لم توافق العميلة على الشروط إلكترونيًا بعد؛ استخدمي التأكيد اليدوي بعد تسجيل موافقتها.'
+    case 'TERMS_ALREADY_ACCEPTED':
+      return 'وافقت العميلة على الشروط إلكترونيًا؛ استخدمي تأكيد استلام العربون.'
+    case 'SETTINGS_CHANGED':
+      return 'تغيّرت إعدادات التأكيد الإلكتروني أثناء تنفيذ الإجراء. حدّثي التفاصيل ثم أعيدي المحاولة.'
     case 'BOOKING_NOT_FOUND':
       return 'لم يعد طلب الحجز موجودًا أو متاحًا.'
     case 'INVALID_BOOKING_ID':
@@ -284,35 +535,63 @@ function getMutationErrorMessage(
 function ActionConfirmationDialog({
   action,
   booking,
-  note,
+  flowVersion,
+  inputs,
+  fieldErrors,
+  invalidAttempt,
   errorMessage,
   isSubmitting,
   isActionStillAllowed,
   unavailableMessage,
   opener,
   fallbackFocusRef,
-  onNoteChange,
+  onInputChange,
   onConfirm,
   onCancel,
 }: ActionConfirmationDialogProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null)
   const safeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const hoursInputRef = useRef<HTMLInputElement | null>(null)
+  const amountInputRef = useRef<HTMLInputElement | null>(null)
+  const noteInputRef = useRef<HTMLTextAreaElement | null>(null)
   const titleId = useId()
   const descriptionId = useId()
   const noteId = useId()
   const noteCounterId = useId()
+  const noteErrorId = useId()
+  const hoursId = useId()
+  const hoursHintId = useId()
+  const hoursErrorId = useId()
+  const amountId = useId()
+  const amountHintId = useId()
+  const amountErrorId = useId()
   const isDestructive = isDestructiveAction(action)
+  const showsHours = action === 'extend_hold'
+  const showsAmount = takesDepositAmount(action, flowVersion)
+  // The reason is part of the record (H3), or of accepting less (TM-20).
+  const noteIsRequired =
+    action === 'confirm_offline' ||
+    (showsAmount && fieldErrors.note === LOW_AMOUNT_NOTE_ERROR)
+  const approvalPreviewText =
+    action === 'approve' ? describeApprovalPreview(booking.approvalPreview) : null
+  const showsHold =
+    flowVersion === 2 &&
+    booking.holdExpiresAt !== null &&
+    (showsHours || showsAmount || action === 'expire_hold')
 
   // Scroll lock, initial focus and focus return. A destructive action (reject,
-  // cancel) opens on the SAFE button «تراجع», so a stray Enter never confirms
-  // it; any other action opens on its confirm button. The dialog is keyed by
-  // its action, so this runs once per opening.
+  // cancel, expire) opens on the SAFE button «تراجع», so a stray Enter never
+  // confirms it; an action with a field to fill opens on that field; any
+  // other action opens on its confirm button. The dialog is keyed by its
+  // action, so this runs once per opening.
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     const initialFocusTarget = isDestructive
       ? safeButtonRef.current
-      : confirmButtonRef.current
+      : (hoursInputRef.current ??
+        amountInputRef.current ??
+        confirmButtonRef.current)
     const fallbackFocusTarget = fallbackFocusRef.current
 
     document.body.style.overflow = 'hidden'
@@ -336,6 +615,24 @@ function ActionConfirmationDialog({
       }
     }
   }, [fallbackFocusRef, isDestructive, opener])
+
+  // A refused attempt lands on the first field with an error (text under
+  // the field, aria-invalid on it), in the order the fields render.
+  useEffect(() => {
+    if (invalidAttempt === 0) {
+      return
+    }
+
+    const target = fieldErrors.extendHours
+      ? hoursInputRef.current
+      : fieldErrors.depositAmount
+        ? amountInputRef.current
+        : fieldErrors.note
+          ? noteInputRef.current
+          : null
+
+    target?.focus()
+  }, [fieldErrors, invalidAttempt])
 
   // The confirm button is disabled while the request runs, which drops focus
   // to <body>; the password prompt, when one opened, hands it back to this
@@ -452,6 +749,19 @@ function ActionConfirmationDialog({
     }
   }
 
+  const noteDescribedBy = [noteCounterId, fieldErrors.note ? noteErrorId : null]
+    .filter((id) => id !== null)
+    .join(' ')
+  const hoursDescribedBy = [hoursHintId, fieldErrors.extendHours ? hoursErrorId : null]
+    .filter((id) => id !== null)
+    .join(' ')
+  const amountDescribedBy = [
+    amountHintId,
+    fieldErrors.depositAmount ? amountErrorId : null,
+  ]
+    .filter((id) => id !== null)
+    .join(' ')
+
   return createPortal(
     <div
       className="booking-action-dialog__backdrop"
@@ -482,6 +792,13 @@ function ActionConfirmationDialog({
           <span>{actionDescriptions[action]}</span>
         </p>
 
+        {approvalPreviewText && (
+          <p className="notice notice--info">
+            <AdminIcon className="notice__icon" name="info" />
+            <span>{approvalPreviewText}</span>
+          </p>
+        )}
+
         <dl className="booking-action-dialog__summary">
           <div>
             <dt>مرجع الطلب</dt>
@@ -501,27 +818,156 @@ function ActionConfirmationDialog({
             <dt>تاريخ المناسبة</dt>
             <dd>{formatAdminCalendarDate(booking.eventDate)}</dd>
           </div>
+          {showsHold && booking.holdExpiresAt !== null && (
+            <div>
+              <dt>المهلة الحالية</dt>
+              <dd>{formatAdminTimestamp(booking.holdExpiresAt)}</dd>
+            </div>
+          )}
+          {showsAmount && typeof booking.depositAmount === 'number' && (
+            <div>
+              <dt>العربون المطلوب</dt>
+              <dd>{formatAdminCurrency(booking.depositAmount)}</dd>
+            </div>
+          )}
+          {showsAmount && (
+            <div>
+              <dt>إجمالي الحجز</dt>
+              <dd>{formatAdminCurrency(booking.estimatedTotal)}</dd>
+            </div>
+          )}
         </dl>
 
-        <div className="field booking-action-dialog__field">
+        {showsHours && (
+          <div
+            className={`field booking-action-dialog__field${
+              fieldErrors.extendHours ? ' field--error' : ''
+            }`}
+          >
+            <label className="field__label" htmlFor={hoursId}>
+              عدد ساعات التمديد
+              <span className="field__required" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <input
+              id={hoursId}
+              ref={hoursInputRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={inputs.extendHours}
+              onChange={(event) =>
+                onInputChange('extendHours', event.currentTarget.value)
+              }
+              maxLength={MAXIMUM_NUMBER_INPUT_LENGTH}
+              disabled={isSubmitting}
+              required
+              aria-required="true"
+              aria-invalid={fieldErrors.extendHours ? true : undefined}
+              aria-describedby={hoursDescribedBy}
+            />
+            <span className="field__hint" id={hoursHintId}>
+              من {MINIMUM_EXTEND_HOURS} إلى {MAXIMUM_EXTEND_HOURS} ساعة، تُضاف
+              إلى المهلة الحالية أو إلى الآن أيهما أبعد.
+            </span>
+            {fieldErrors.extendHours && (
+              <p className="field__error" id={hoursErrorId}>
+                <AdminIcon className="notice__icon" name="alert" />
+                <span>{fieldErrors.extendHours}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {showsAmount && (
+          <div
+            className={`field booking-action-dialog__field${
+              fieldErrors.depositAmount ? ' field--error' : ''
+            }`}
+          >
+            <label className="field__label" htmlFor={amountId}>
+              مبلغ العربون المستلم (بالريال)
+              <span className="field__required" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <input
+              id={amountId}
+              ref={amountInputRef}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={inputs.depositAmount}
+              onChange={(event) =>
+                onInputChange('depositAmount', event.currentTarget.value)
+              }
+              maxLength={MAXIMUM_NUMBER_INPUT_LENGTH}
+              disabled={isSubmitting}
+              required
+              aria-required="true"
+              aria-invalid={fieldErrors.depositAmount ? true : undefined}
+              aria-describedby={amountDescribedBy}
+            />
+            <span className="field__hint" id={amountHintId}>
+              {BANK_STATEMENT_HINT}
+            </span>
+            {fieldErrors.depositAmount && (
+              <p className="field__error" id={amountErrorId}>
+                <AdminIcon className="notice__icon" name="alert" />
+                <span>{fieldErrors.depositAmount}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        <div
+          className={`field booking-action-dialog__field${
+            fieldErrors.note ? ' field--error' : ''
+          }`}
+        >
           <label className="field__label" htmlFor={noteId}>
-            ملاحظة داخلية عن هذا الانتقال (اختيارية)
+            {action === 'confirm_offline'
+              ? 'سبب التأكيد اليدوي'
+              : noteIsRequired
+                ? 'ملاحظة توضّح سبب قبول مبلغ أقل'
+                : 'ملاحظة داخلية عن هذا الانتقال (اختيارية)'}
+            {noteIsRequired && (
+              <span className="field__required" aria-hidden="true">
+                *
+              </span>
+            )}
           </label>
           <textarea
             id={noteId}
-            value={note}
-            onChange={(event) => onNoteChange(event.currentTarget.value)}
+            ref={noteInputRef}
+            value={inputs.note}
+            onChange={(event) => onInputChange('note', event.currentTarget.value)}
             maxLength={MAXIMUM_TRANSITION_NOTE_LENGTH}
             rows={4}
             disabled={isSubmitting}
-            aria-describedby={noteCounterId}
+            required={noteIsRequired || undefined}
+            aria-required={noteIsRequired || undefined}
+            aria-invalid={fieldErrors.note ? true : undefined}
+            aria-describedby={noteDescribedBy}
           />
           <span className="field__hint booking-actions__counter" id={noteCounterId}>
+            {action === 'confirm_offline' && (
+              <>
+                {`${MINIMUM_OFFLINE_NOTE_CODE_POINTS} أحرف على الأقل، بلا روابط أو أرقام حسابات أو أرقام جوال. `}
+              </>
+            )}
             <bdi dir="ltr">
-              {note.length} / {MAXIMUM_TRANSITION_NOTE_LENGTH}
+              {inputs.note.length} / {MAXIMUM_TRANSITION_NOTE_LENGTH}
             </bdi>{' '}
             حرف
           </span>
+          {fieldErrors.note && (
+            <p className="field__error" id={noteErrorId}>
+              <AdminIcon className="notice__icon" name="alert" />
+              <span>{fieldErrors.note}</span>
+            </p>
+          )}
         </div>
 
         {unavailableMessage && (
@@ -594,7 +1040,10 @@ export default function BookingActions({
   )
   const [activeAction, setActiveAction] =
     useState<AdminBookingAction | null>(null)
-  const [transitionNote, setTransitionNote] = useState('')
+  const [actionInputs, setActionInputs] = useState<ActionInputs>(EMPTY_INPUTS)
+  const [fieldErrors, setFieldErrors] =
+    useState<ActionFieldErrors>(NO_FIELD_ERRORS)
+  const [invalidAttempt, setInvalidAttempt] = useState(0)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] =
     useState<ActionFeedback | null>(null)
@@ -622,6 +1071,7 @@ export default function BookingActions({
   const isStackedLayout = useMediaQuery(ADMIN_STACKED_LAYOUT_QUERY)
   const actionBarTarget = isStackedLayout ? stickyActionBar : null
   const isBusy = isActionSubmitting || isNotesSubmitting
+  const flowVersion = resolveFlowVersion(booking)
 
   const serverNotes = booking.adminNotes ?? ''
   const currentNotesState =
@@ -719,7 +1169,9 @@ export default function BookingActions({
     }
 
     setActionOpener(event.currentTarget)
-    setTransitionNote('')
+    setActionInputs(EMPTY_INPUTS)
+    setFieldErrors(NO_FIELD_ERRORS)
+    setInvalidAttempt(0)
     setActionError(null)
     setActionSuccess(null)
     setActiveAction(action)
@@ -731,8 +1183,17 @@ export default function BookingActions({
     }
 
     setActiveAction(null)
-    setTransitionNote('')
+    setActionInputs(EMPTY_INPUTS)
+    setFieldErrors(NO_FIELD_ERRORS)
     setActionError(null)
+  }
+
+  function updateActionInput(field: keyof ActionInputs, value: string) {
+    setActionInputs((current) => ({ ...current, [field]: value }))
+    // The field's message goes once it is edited; the next attempt re-checks.
+    setFieldErrors((current) =>
+      current[field] === null ? current : { ...current, [field]: null },
+    )
   }
 
   async function submitAction() {
@@ -741,6 +1202,19 @@ export default function BookingActions({
       !isActionStillAllowed ||
       actionSubmissionRef.current
     ) {
+      return
+    }
+
+    const parsedInputs = parseActionInputs(
+      activeAction,
+      flowVersion,
+      booking,
+      actionInputs,
+    )
+
+    if (!parsedInputs.ok) {
+      setFieldErrors(parsedInputs.errors)
+      setInvalidAttempt((count) => count + 1)
       return
     }
 
@@ -753,7 +1227,6 @@ export default function BookingActions({
     actionAbortControllerRef.current = abortController
 
     const submittedAction = activeAction
-    const normalizedNote = transitionNote.trim()
     const token = await getIdToken()
 
     if (!isMountedRef.current || abortController.signal.aborted) {
@@ -772,10 +1245,7 @@ export default function BookingActions({
     const result = await performAdminBookingAction(
       token,
       booking.id,
-      {
-        action: submittedAction,
-        ...(normalizedNote ? { note: normalizedNote } : {}),
-      },
+      parsedInputs.request,
       abortController.signal,
       adminSession,
     )
@@ -796,7 +1266,7 @@ export default function BookingActions({
         customerNotEmailed: result.data.customerEmailQueued === false,
       })
       setActiveAction(null)
-      setTransitionNote('')
+      setActionInputs(EMPTY_INPUTS)
     } else {
       setActionError(getMutationErrorMessage(result.error, 'action'))
 
@@ -806,7 +1276,10 @@ export default function BookingActions({
         setTodayKey(getRiyadhToday().key)
       }
 
-      if (result.error.code === 'INVALID_STATUS_TRANSITION') {
+      if (
+        result.error.code !== undefined &&
+        STALE_STATE_CODES.has(result.error.code)
+      ) {
         onRefreshDetails()
         onRefreshList()
       }
@@ -946,6 +1419,16 @@ export default function BookingActions({
         <p className="booking-actions__lead">
           تظهر فقط الإجراءات التي يسمح بها الخادم لحالة الطلب الحالية.
         </p>
+        {flowVersion === 2 && (
+          <p className="booking-actions__lead">
+            هذا الطلب على مسار التأكيد الإلكتروني
+            {booking.holdExpiresAt !== null &&
+            (booking.status === 'approved_hold' ||
+              booking.status === 'expired')
+              ? `؛ مهلة الحجز المؤقت: ${formatAdminTimestamp(booking.holdExpiresAt)}.`
+              : '.'}
+          </p>
+        )}
       </header>
 
       {visibleActionSuccess && (
@@ -992,6 +1475,19 @@ export default function BookingActions({
           <span>
             مضى تاريخ هذه المناسبة، لذلك لم يعد قبول الطلب متاحًا. يمكنكِ
             رفضه.
+          </span>
+        </p>
+      )}
+
+      {booking.noticeProtected === true && (
+        // B1 / UX-02: she said she transferred for this deadline; the hold
+        // never expires on its own, the owner decides against the statement.
+        <p className="notice notice--info">
+          <AdminIcon className="notice__icon" name="info" />
+          <span>
+            أبلغت العميلة بتحويل العربون لهذه المهلة، فلن ينتهي الحجز المؤقت
+            تلقائيًا. تحققي من كشف الحساب البنكي ثم أكّدي الاستلام أو أنهي
+            الحجز المؤقت بنفسكِ.
           </span>
         </p>
       )}
@@ -1145,15 +1641,18 @@ export default function BookingActions({
           booking={booking}
           errorMessage={actionError}
           fallbackFocusRef={actionsHeadingRef}
+          fieldErrors={fieldErrors}
+          flowVersion={flowVersion}
+          inputs={actionInputs}
+          invalidAttempt={invalidAttempt}
           isActionStillAllowed={isActionStillAllowed}
           isSubmitting={isActionSubmitting}
           key={activeAction}
-          note={transitionNote}
           opener={actionOpener}
           unavailableMessage={actionUnavailableMessage}
           onCancel={closeActionDialog}
           onConfirm={submitAction}
-          onNoteChange={setTransitionNote}
+          onInputChange={updateActionInput}
         />
       )}
     </section>

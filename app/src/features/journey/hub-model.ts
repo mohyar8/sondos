@@ -83,14 +83,12 @@ const legacyStatusCopy: Readonly<Record<CustomerBookingStatus, StatusCopy>> = {
   },
   payment_pending: {
     label: 'بانتظار تحويل العربون',
-    guidance:
-      'حوّلي العربون حسب التفاصيل التي وصلتكِ عبر واتساب، ثم أرسلي صورة الإيصال من زر واتساب أدناه ليتأكد حجزكِ.',
+    guidance: 'بانتظار تحويل العربون حسب التعليمات المتفق عليها عبر واتساب.',
     tone: 'info',
   },
   confirmed: {
     label: 'الحجز مؤكد',
-    guidance:
-      'تم استلام العربون وتأكيد الحجز. تصلكِ جميع اللقطات في اليوم التالي للتصوير عبر رابط Drive آمن، ويبدأ تجهيز الألبوم بعد تأكيد اختياركِ لصوره (من شهرين إلى 6 أشهر)، ثم نتفق معكِ عبر واتساب على استلامه أو توصيله.',
+    guidance: 'تم استلام العربون وتأكيد الحجز بنجاح.',
     tone: 'success',
   },
   rejected: {
@@ -603,8 +601,6 @@ export function describeExtra(extra: BookingSnapshotExtra): string {
       return `${extra.name} — ${formatArabicCount(extra.quantity, 'copy')}، ${formatArabicCount(extra.pageCount, 'page')} لكل نسخة`
     case 'wooden_enlargement':
       return `${extra.name} (${extra.dimensions}) — الكمية ${extra.quantity}`
-    case 'coverage_addon':
-      return `${extra.name} — ${formatSar(extra.unitPrice)}`
   }
 }
 
@@ -703,9 +699,8 @@ function legacyWhatsAppMessage(
     case 'approved_hold':
     case 'contract_pending':
     case 'contract_signed':
-      return `السلام عليكم، حجزي رقم ${reference} تم قبوله، وأرغب في إكمال الحجز وتحويل العربون.`
     case 'payment_pending':
-      return `السلام عليكم، حوّلتُ العربون لحجزي رقم ${reference}، وهذه صورة الإيصال:`
+      return `السلام عليكم، حجزي رقم ${reference} تم قبوله، وأحتاج مساعدة لإكمال باقي الخطوات.`
     case 'confirmed':
       return `السلام عليكم، حجزي رقم ${reference} مؤكد والحمد لله، ولدي استفسار بخصوص يوم التصوير.`
     case 'rejected':
