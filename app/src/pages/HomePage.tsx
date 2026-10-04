@@ -6,6 +6,7 @@ import DifferenceSection from './home/DifferenceSection'
 import FaqSection from './home/FaqSection'
 import FeaturedWorkSection from './home/FeaturedWorkSection'
 import HeroSection from './home/HeroSection'
+import ServicesTicker from './home/ServicesTicker'
 import ServicesSection from './home/ServicesSection'
 import StorySection from './home/StorySection'
 import TrustSection from './home/TrustSection'
@@ -30,6 +31,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   return (
     <main id="main-content" className="home" ref={mainRef}>
       <HeroSection onNavigate={onNavigate} />
+      <ServicesTicker />
       <StorySection />
       <DifferenceSection />
       <FeaturedWorkSection onNavigate={onNavigate} />

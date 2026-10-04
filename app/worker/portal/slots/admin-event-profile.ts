@@ -1,5 +1,4 @@
 import type { AdminPortalRoute } from '../admin-portal-routes.js'
-import { handleAdminGetEventProfile } from '../event-profile.js'
 
 /**
  * Slot: admin view of the event profile (11 §3.2 #22), filled by W2-06.
@@ -7,12 +6,4 @@ import { handleAdminGetEventProfile } from '../event-profile.js'
  * - GET ['bookings', ':bookingId', 'event-profile']
  * Auth AD. Gate 'open'.
  */
-export const adminEventProfileRoutes: readonly AdminPortalRoute[] = [
-  {
-    path: ['bookings', ':bookingId', 'event-profile'],
-    gate: 'open',
-    handlers: {
-      GET: handleAdminGetEventProfile,
-    },
-  },
-]
+export const adminEventProfileRoutes: readonly AdminPortalRoute[] = []

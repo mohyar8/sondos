@@ -6,6 +6,7 @@ import {
 } from '../../data/site-images'
 import AppLink from '../../layout/AppLink'
 import type { NavigationHandler } from '../../layout/navigation'
+import DisplayHeading from '../../components/DisplayHeading'
 
 interface FeaturedWorkSectionProps {
   onNavigate: NavigationHandler
@@ -54,7 +55,7 @@ export default function FeaturedWorkSection({
       <div className="container">
         <header className="section-heading reveal">
           <p className="eyebrow">معرض الأعمال</p>
-          <h2 id="home-featured-title">لقطات مختارة من أعمالنا</h2>
+          <DisplayHeading id="home-featured-title" text="لقطات مختارة من أعمالنا" ornament />
           <p>
             تفاصيل من أيام وثّقناها بعناية، وجميع الصور تُنشر بموافقة العروس.
           </p>

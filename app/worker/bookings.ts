@@ -10,11 +10,10 @@ import {
   serializeJourneyDeadline,
   type FlowVersion,
   type JourneyStageId,
-  type JourneyStageSubState,
+  type JourneySubState,
 } from '../shared/journey.js'
 import { OPEN_BOOKING_REQUESTS_MAX } from '../shared/limits.js'
 import type { EmailDeliveryResult } from '../shared/notifications.js'
-import type { StudioContact } from '../shared/settings.js'
 import { latestBookableDateKey, riyadhDateKey } from '../shared/timing.js'
 import {
   authenticateFirebaseRequest,
@@ -37,16 +36,10 @@ import {
 import { sendEmail } from './email.js'
 import {
   MAXIMUM_JOURNEY_ROWS,
-  isMissingPortalSchemaError,
   loadCustomerBookingRecords,
   type CustomerBookingRecord,
 } from './portal/journey-loader.js'
-import {
-  isRateLimited,
-  openRequestLimitResponse,
-  rateLimitedResponse,
-} from './rate-limit.js'
-import { readStudioContact } from './settings/settings-read.js'
+import { isRateLimited, rateLimitedResponse } from './rate-limit.js'
 import {
   checkCustomerAccount,
   isEmailBoundToToken,
@@ -68,9 +61,8 @@ interface BookingBody {
 }
 
 /**
- * One item of GET /api/bookings/me (07-api-contracts §3.A; plan 11 §3.3
- * #1). The first nine fields are unchanged; the rest are the additive
- * journey fields, the last two from Wave 2 (W2-16).
+ * One item of GET /api/bookings/me (07-api-contracts §3.A). The first nine
+ * fields are unchanged; the rest are the additive journey fields.
  */
 interface CustomerBookingPayload {
   id: string
@@ -85,24 +77,11 @@ interface CustomerBookingPayload {
   flowVersion: FlowVersion
   stage: JourneyStageId | null
   stageLabel: string | null
-  /** Also `awaiting_deposit` / `deposit_reported` on a flow-2 hold (UX-02). */
-  stageSubState: JourneyStageSubState | null
+  stageSubState: JourneySubState | null
   /** ISO instant, or a `YYYY-MM-DD` Riyadh date at stages 5–6; see shared/journey.ts. */
   stageDeadline: string | null
   depositAmount: number | null
-  /** When she accepted the terms (flow 2), or null. */
-  termsAcceptedAt: string | null
-  /** The instant of the status change or stage event behind `stage` (UX-14). */
-  stageUpdatedAt: string | null
 }
-
-/**
- * Top-level `studio` of GET /api/bookings/me: the effective contact number
- * and, within 72 h of a change, when it changed (TM-03, TM-19). Both null
- * when no contact revision is in force; the SPA then uses its compiled
- * number (src/lib/whatsapp.ts).
- */
-type StudioContactPayload = StudioContact
 
 interface ExistenceRow {
   found: number
@@ -271,6 +250,21 @@ function duplicateRequestResponse(): Response {
     409,
     'DUPLICATE_BOOKING_REQUEST',
     'لديكِ طلب حجز مفتوح لهذا التاريخ بالفعل.',
+  )
+}
+
+/**
+ * 409 for the open-request cap, under Wave 0's code and message: the booking
+ * form (src/api/bookings.ts) accepts TOO_MANY_OPEN_REQUESTS only, and any
+ * other code there reads as a malformed answer and «حاولي مرة أخرى لاحقًا».
+ * The plan's OPEN_REQUEST_LIMIT (rate-limit.ts openRequestLimitResponse)
+ * replaces it once that client accepts the new code (W2-16).
+ */
+function tooManyOpenRequestsResponse(): Response {
+  return errorResponse(
+    409,
+    'TOO_MANY_OPEN_REQUESTS',
+    `لديكِ ${OPEN_BOOKING_REQUESTS_MAX} طلبات حجز مفتوحة، وهو الحد الأقصى. انتظري مراجعتها أو تواصلي معنا عبر واتساب قبل إرسال طلب جديد.`,
   )
 }
 
@@ -443,10 +437,8 @@ function conflictResponse(conflicts: SubmissionConflicts): Response | null {
     return duplicateRequestResponse()
   }
 
-  // The plan's 409 OPEN_REQUEST_LIMIT (rate-limit.ts). The booking form
-  // reads it, and a Wave 0 Worker's TOO_MANY_OPEN_REQUESTS, as the same cap.
   if (conflicts.openRequestLimitReached) {
-    return openRequestLimitResponse()
+    return tooManyOpenRequestsResponse()
   }
 
   return null
@@ -615,7 +607,7 @@ async function createBooking(
 
   // The users clause is the SEC-04 binding: the row must hold the token's
   // verified address, proven, and not be erased. The COUNT is the SEC-03 cap
-  // (OPEN_BOOKING_REQUESTS_MAX, 409 OPEN_REQUEST_LIMIT) on requests
+  // (OPEN_BOOKING_REQUESTS_MAX, 409 TOO_MANY_OPEN_REQUESTS) on requests
   // before `confirmed` whose date is today (Riyadh) or later: a request whose
   // date has passed can never be approved (admin-workflow.ts), so requests
   // the owner never got to cannot lock her out. Inside the INSERT, so
@@ -922,18 +914,14 @@ export async function handleMyBookings(
     return standing.response
   }
 
-  // One instant for every derivation, for the studio's 72 h change window
-  // and for `serverTime`, so the stages and the client's countdown
-  // correction agree with each other.
+  const { records } = await loadCustomerBookingRecords(
+    env.DB,
+    identity.uid,
+    MAXIMUM_BOOKINGS_PER_RESPONSE,
+  )
+  // One instant for every derivation and for `serverTime`, so the stages and
+  // the client's countdown correction agree with each other.
   const now = new Date()
-  const [{ records }, studio] = await Promise.all([
-    loadCustomerBookingRecords(
-      env.DB,
-      identity.uid,
-      MAXIMUM_BOOKINGS_PER_RESPONSE,
-    ),
-    readStudioContactPayload(env, now),
-  ])
   const bookings = records.map((record) =>
     toCustomerBookingPayload(record, now),
   )
@@ -942,31 +930,7 @@ export async function handleMyBookings(
     ok: true,
     bookings,
     serverTime: now.toISOString(),
-    studio,
   })
-}
-
-/**
- * The effective studio number (worker/settings/settings-read.ts). Rollout
- * safety only, as the loader's own fallback: a database without migration
- * 0008 has no revisions, which is the "no number" answer, not a reason to
- * hide her bookings. Any other failure still fails the request.
- */
-async function readStudioContactPayload(
-  env: Env,
-  now: Date,
-): Promise<StudioContactPayload> {
-  try {
-    return await readStudioContact(env.DB, now)
-  } catch (error) {
-    if (!isMissingPortalSchemaError(error)) {
-      throw error
-    }
-
-    console.error('STUDIO_CONTACT_SCHEMA_UNAVAILABLE')
-
-    return { whatsappNumber: null, whatsappNumberChangedAt: null }
-  }
 }
 
 function toCustomerBookingPayload(
@@ -992,7 +956,5 @@ function toCustomerBookingPayload(
     stageSubState: journey.subState,
     stageDeadline: serializeJourneyDeadline(journey.deadline),
     depositAmount: record.depositAmount,
-    termsAcceptedAt: record.termsAcceptedAt,
-    stageUpdatedAt: journey.updatedAt,
   }
 }

@@ -4,6 +4,7 @@ import ResponsiveImage from '../components/ResponsiveImage'
 import { packagesBannerId, siteImages } from '../data/site-images'
 import { useReveal } from '../layout/useReveal'
 import './PackagesPage.css'
+import DisplayHeading from '../components/DisplayHeading'
 
 /**
  * Page banner (design-system §5.4 item 1, copy 08-copy-ar §3.1): a short
@@ -26,7 +27,7 @@ function PackagesBanner() {
         fetchPriority="high"
       />
       <div className="packages-banner__content container">
-        <h1 className="packages-banner__title">اختاري باقتكِ وتفاصيل يومكِ</h1>
+        <DisplayHeading as="h1" className="packages-banner__title" text="اختاري باقتكِ وتفاصيل يومكِ" />
         <p className="packages-banner__text">
           كوّني خيارات التصوير والألبوم والمطبوعات، وشاهدي السعر التقديري
           مباشرة أمامكِ.
@@ -59,7 +60,7 @@ function BookingStepsSection() {
       <div className="container">
         <header className="section-heading reveal">
           <p className="eyebrow">من الاختيار إلى التأكيد</p>
-          <h2 id="packages-steps-title">خطوات حجز بسيطة</h2>
+          <DisplayHeading id="packages-steps-title" text="خطوات حجز بسيطة" ornament />
         </header>
 
         <ol className="packages-steps__list" role="list">
@@ -96,7 +97,7 @@ function PackagesSection() {
       <div className="container">
         <header className="section-heading">
           <p className="eyebrow">صممي تغطيتكِ</p>
-          <h2 id="packages-title">باقات وأسعار تصوير العروس</h2>
+          <DisplayHeading id="packages-title" text="باقات وأسعار تصوير العروس" ornament />
         </header>
         <PackageConfigurator />
       </div>

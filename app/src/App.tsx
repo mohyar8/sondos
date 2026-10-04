@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from './auth/auth-context'
 import PublicSiteShell from './layout/PublicSiteShell'
@@ -36,6 +37,22 @@ function readBrowserLocation(revision: number): BrowserLocation {
     pathname: normalizePathname(window.location.pathname),
     hash: window.location.hash,
     revision,
+  }
+}
+
+/** View transitions only in the cinematic design and without reduced motion. */
+function canAnimatePageChange(): boolean {
+  return (
+    document.documentElement.getAttribute('data-design') === 'cinematic' &&
+    typeof document.startViewTransition === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+/** A transition skipped by a quick second click rejects with AbortError. */
+function ignoreSkippedTransition(error: unknown): void {
+  if (!(error instanceof DOMException)) {
+    throw error
   }
 }
 
@@ -110,15 +127,33 @@ export default function App() {
     const destinationUrl = `${destination.pathname}${destination.search}${destination.hash}`
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
 
+    const pathChanges = destination.pathname !== window.location.pathname
+
     if (destinationUrl !== currentUrl) {
       window.history.pushState(null, '', destinationUrl)
     }
 
     // A chunk that failed earlier gets a fresh download on the next visit.
     resetFailedLazyComponents()
-    setBrowserLocation((currentLocation) =>
-      readBrowserLocation(currentLocation.revision + 1),
-    )
+
+    const showNextPage = () =>
+      setBrowserLocation((currentLocation) =>
+        readBrowserLocation(currentLocation.revision + 1),
+      )
+
+    if (pathChanges && canAnimatePageChange()) {
+      // Cinematic design only: the page change runs inside a view
+      // transition, and the hero skips its own entrance (data-cine-entry).
+      document.documentElement.setAttribute('data-cine-entry', 'vt')
+      const transition = document.startViewTransition(() => {
+        flushSync(showNextPage)
+      })
+      transition.ready.catch(ignoreSkippedTransition)
+      transition.finished.catch(ignoreSkippedTransition)
+      return
+    }
+
+    showNextPage()
   }, [])
 
   if (activePath === '/admin') {

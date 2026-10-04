@@ -3,6 +3,7 @@ import {
   BOOKING_REQUEST_HREF,
   type NavigationHandler,
 } from '../../layout/navigation'
+import DisplayHeading from '../../components/DisplayHeading'
 
 interface BookingStepsSectionProps {
   onNavigate: NavigationHandler
@@ -55,7 +56,7 @@ export default function BookingStepsSection({
       <div className="container">
         <header className="section-heading reveal">
           <p className="eyebrow">من الاختيار إلى الألبوم</p>
-          <h2 id="home-steps-title">رحلة حجز واضحة، خطوة بخطوة</h2>
+          <DisplayHeading id="home-steps-title" text="رحلة حجز واضحة، خطوة بخطوة" ornament />
         </header>
 
         <ol className="home-steps__list" role="list">

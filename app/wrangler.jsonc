@@ -43,14 +43,13 @@
     // is locked out of the settings.
     "ADMIN_SETTINGS_2F": "off"
   },
-  // Production starts on a new, empty D1 (decision D19c). The placeholder id
-  // keeps a deploy failing until W7-01 writes the id printed by
-  // `wrangler d1 create sundus-yar-production`.
+  // Production starts on a new, empty D1 (decision D19c), created
+  // 2026-10-01 in this account with location hint eeur.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "sundus-yar-production",
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "3e8d75cc-fb15-4a69-9461-63c69859f5c1"
     }
   ],
   // Burst limits per 60 seconds (plan 11 §3.1, audit SEC-03; the binding

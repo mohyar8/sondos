@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { coverageOptions } from '../../data/packages'
+import { coverageAddonOptions, coverageOptions } from '../../data/packages'
 import AppLink from '../../layout/AppLink'
 import {
   BOOKING_REQUEST_HREF,
@@ -11,6 +11,7 @@ import {
   WHATSAPP_DISPLAY_NUMBER,
 } from '../../lib/whatsapp'
 import { DisclosureIcon } from './icons'
+import DisplayHeading from '../../components/DisplayHeading'
 
 interface FaqSectionProps {
   onNavigate: NavigationHandler
@@ -62,7 +63,36 @@ function getFaqItems(onNavigate: NavigationHandler): readonly FaqItem[] {
               </li>
             ))}
           </ul>
+          <p>
+            ويمكنكِ إضافة{' '}
+            {coverageAddonOptions.map((option, index) => (
+              <span key={option.id}>
+                {index > 0 && ' أو '}
+                {option.label} ({priceFormatter.format(option.price)})
+              </span>
+            ))}{' '}
+            إلى أي مدة تغطية.
+          </p>
         </>
+      ),
+    },
+    {
+      question: 'هل تصوّرون مناسبات غير عقد القران والزواج؟',
+      answer: (
+        <p>
+          نعم. إلى جانب عقد القران والزواج نصوّر الصور العائلية والمناسبات
+          الصغيرة مثل أعياد الميلاد والتخرج وغيرها. تواصلي معنا عبر واتساب
+          لنرتّب معكِ تفاصيل مناسبتكِ.
+        </p>
+      ),
+    },
+    {
+      question: 'متى أستلم صوري؟',
+      answer: (
+        <p>
+          في اليوم التالي مباشرة لتاريخ التصوير، تصلكِ جميع اللقطات عبر رابط
+          Drive آمن.
+        </p>
       ),
     },
     {
@@ -71,6 +101,27 @@ function getFaqItems(onNavigate: NavigationHandler): readonly FaqItem[] {
         <p>
           التغطية والألبوم والمطبوعات عناصر منفصلة تختارينها حسب رغبتكِ، ويظهر
           الإجمالي التقديري مباشرة أثناء اختيار التفاصيل في صفحة الباقات.
+        </p>
+      ),
+    },
+    {
+      question: 'كم تستغرق مدة تجهيز الألبوم؟',
+      answer: (
+        <p>
+          تبدأ مدة تجهيز الألبوم من تاريخ اختياركِ لصور الألبوم وتأكيدها
+          نهائيًا، وتتراوح بين شهرين و6 أشهر كحد أقصى، وقد يتم التسليم قبل ذلك
+          حسب جدول العمل، لضمان منح كل ألبوم الوقت الكافي للعناية بتفاصيله
+          وإخراجه بأفضل صورة.
+        </p>
+      ),
+    },
+    {
+      question: 'كيف تُرتَّب الصور داخل صفحات الألبوم؟',
+      answer: (
+        <p>
+          نرتّب الصور داخل صفحات الألبوم وفق اختياركِ، ونعرض عليكِ نموذجًا
+          مبدئيًا قبل التنفيذ، ويمكنكِ تعديل ترتيب الصور مرة واحدة قبل اعتماد
+          التصميم النهائي والطباعة.
         </p>
       ),
     },
@@ -146,7 +197,7 @@ export default function FaqSection({ onNavigate }: FaqSectionProps) {
       <div className="container">
         <header className="section-heading reveal">
           <p className="eyebrow">قبل الحجز</p>
-          <h2 id="home-faq-title">الأسئلة الشائعة</h2>
+          <DisplayHeading id="home-faq-title" text="الأسئلة الشائعة" ornament />
         </header>
 
         <ul className="home-faq__list reveal" role="list">

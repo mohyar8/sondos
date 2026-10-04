@@ -8,17 +8,13 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:classic": "node scripts/build-design.mjs classic --dev",
-    "dev:cinematic": "node scripts/build-design.mjs cinematic --dev",
     "build": "tsc -b && vite build",
-    "build:classic": "node scripts/build-design.mjs classic",
     "build:cinematic": "node scripts/build-design.mjs cinematic",
+    "build:classic": "node scripts/build-design.mjs classic",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "node --import ./tests/setup/no-network.mjs --import ./tests/setup/resolve-ts.mjs --test \"tests/**/*.test.mjs\"",
     "verify": "node scripts/verify.mjs",
-    "audit:motion": "node scripts/motion-audit.mjs runtime",
-    "audit:parity": "node scripts/motion-audit.mjs parity",
     "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {

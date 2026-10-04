@@ -7,18 +7,15 @@ import {
 import {
   isFlowVersion,
   isIsoInstant,
-  isJourneyDepositSubState,
   isJourneyStageId,
   isJourneySubState,
   journeyStageLabels,
   parseJourneyDeadline,
   type FlowVersion,
   type JourneyDeadline,
-  type JourneyDepositSubState,
   type JourneyStageId,
   type JourneySubState,
 } from '../../shared/journey'
-import { isWhatsappDigits } from '../../shared/settings'
 import {
   retryAfterReauthentication,
   type ApiSession,
@@ -39,12 +36,7 @@ export type CreateBookingApiErrorCode =
   | 'DUPLICATE_BOOKING_REQUEST'
   | 'UNSUPPORTED_MEDIA_TYPE'
   | 'INTERNAL_ERROR'
-  /**
-   * 409: she already has the most open requests one account may have. The
-   * Worker's wire code is the plan's OPEN_REQUEST_LIMIT (a Wave 0 Worker
-   * sends TOO_MANY_OPEN_REQUESTS); both arrive here under this one name,
-   * which the booking form matches exhaustively.
-   */
+  /** 409: she already has the most open requests one account may have. */
   | 'TOO_MANY_OPEN_REQUESTS'
   /** 400: the date is past the booking horizon (shared/timing.ts). */
   | 'BOOKING_TOO_FAR_AHEAD'
@@ -112,41 +104,10 @@ export interface CustomerBooking {
   stage: JourneyStageId | null
   /** Arabic label: this client's own for a known stage, else the server's. */
   stageLabel: string | null
-  /**
-   * The wire `stageSubState` when it is one of the tracker's sub-states
-   * (journey-phases.ts). A deposit sub-state lands in `depositSubState`.
-   */
   stageSubState: JourneySubState | null
-  /**
-   * The wire `stageSubState` when it is the deposit step of a flow-2 hold
-   * (Wave 2, UX-02): `awaiting_deposit` or `deposit_reported` at stage 2,
-   * else null (an older server never sends one).
-   */
-  depositSubState: JourneyDepositSubState | null
   /** Typed by the stage: an ISO instant, or a Riyadh date at stages 5–6. */
   stageDeadline: JourneyDeadline | null
   depositAmount: number | null
-  /** When she accepted the terms (flow 2); null when not, or from an older server. */
-  termsAcceptedAt: string | null
-  /**
-   * The canonical instant of the status change or stage event behind
-   * `stage` (Wave 2, UX-14: «آخر تحديث»), or null when unknown or from an
-   * older server.
-   */
-  stageUpdatedAt: string | null
-}
-
-/**
- * Top-level `studio` of GET /api/bookings/me (Wave 2, TM-03/TM-19). Both
- * fields are null when no contact number is in force, and the whole object
- * is null from an older server; either way the compiled number in
- * src/lib/whatsapp.ts is the fallback and the check she is pointed to.
- */
-export interface StudioContactInfo {
-  /** E.164 digits without "+", validated by the shape src/lib/whatsapp.ts links. */
-  whatsappNumber: string | null
-  /** Canonical instant, set only within 72 h of a change of number. */
-  whatsappNumberChangedAt: string | null
 }
 
 export interface MyBookingsResponse {
@@ -159,7 +120,6 @@ export interface MyBookingsResponse {
    * A countdown uses `Date.now() + serverClockOffsetMs` as "now".
    */
   serverClockOffsetMs: number | null
-  studio: StudioContactInfo | null
 }
 
 /** Some rows failed validation and were left out; the rest are usable. */
@@ -320,9 +280,6 @@ function parseCustomerBooking(value: unknown): CustomerBooking | null {
   }
 
   const stage = isJourneyStageId(value.stage) ? value.stage : null
-  // One wire field, two client fields: a sub-state only counts with its
-  // stage, and a deposit sub-state only at stage 2.
-  const wireSubState = stage === null ? null : value.stageSubState
 
   return {
     id,
@@ -339,46 +296,15 @@ function parseCustomerBooking(value: unknown): CustomerBooking | null {
     flowVersion: isFlowVersion(value.flowVersion) ? value.flowVersion : null,
     stage,
     stageLabel: readStageLabel(stage, value.stageLabel),
-    stageSubState: isJourneySubState(wireSubState) ? wireSubState : null,
-    depositSubState:
-      stage === 'approved_hold' && isJourneyDepositSubState(wireSubState)
-        ? wireSubState
+    stageSubState:
+      stage !== null && isJourneySubState(value.stageSubState)
+        ? value.stageSubState
         : null,
     stageDeadline:
       stage === null ? null : parseJourneyDeadline(stage, value.stageDeadline),
     depositAmount: isNonNegativeSafeInteger(value.depositAmount)
       ? value.depositAmount
       : null,
-    termsAcceptedAt: isTimestamp(value.termsAcceptedAt)
-      ? value.termsAcceptedAt
-      : null,
-    stageUpdatedAt: readCanonicalInstant(value.stageUpdatedAt),
-  }
-}
-
-/** A wire instant in its canonical form, or null for anything else. */
-function readCanonicalInstant(value: unknown): string | null {
-  return isIsoInstant(value) ? new Date(value).toISOString() : null
-}
-
-/**
- * The `studio` object: null when absent (an older server) or not an
- * object; inside it, a number that is not E.164 digits reads as none, so a
- * bad value never becomes a link.
- */
-function parseStudioContact(value: unknown): StudioContactInfo | null {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  const { whatsappNumber, whatsappNumberChangedAt } = value
-
-  return {
-    whatsappNumber:
-      typeof whatsappNumber === 'string' && isWhatsappDigits(whatsappNumber)
-        ? whatsappNumber
-        : null,
-    whatsappNumberChangedAt: readCanonicalInstant(whatsappNumberChangedAt),
   }
 }
 
@@ -434,7 +360,6 @@ function parseMyBookingsResponse(
         serverTimeMs === null ? null : new Date(serverTimeMs).toISOString(),
       serverClockOffsetMs:
         serverTimeMs === null ? null : serverTimeMs - receivedAtMs,
-      studio: parseStudioContact(value.studio),
     },
     skippedCount,
   }
@@ -470,17 +395,12 @@ export function parseMyBookingsBody(
   return parsed === null ? null : toMyBookingsData(parsed)
 }
 
-type ServerBookingErrorCode = Exclude<
+function isServerErrorCode(
+  value: unknown,
+): value is Exclude<
   CreateBookingApiErrorCode,
   'NETWORK_ERROR' | 'MALFORMED_RESPONSE'
->
-
-/**
- * The wire code as this client names it, or null for one it does not know.
- * The open-request cap arrives as the plan's OPEN_REQUEST_LIMIT, or as
- * TOO_MANY_OPEN_REQUESTS from a Wave 0 Worker; both are the one code here.
- */
-function readServerErrorCode(value: unknown): ServerBookingErrorCode | null {
+> {
   switch (value) {
     case 'INVALID_JSON':
     case 'INVALID_EVENT_DATE':
@@ -499,20 +419,23 @@ function readServerErrorCode(value: unknown): ServerBookingErrorCode | null {
     case 'REAUTH_REQUIRED':
     case 'ACCOUNT_ERASED':
     case 'EMAIL_ALREADY_IN_USE':
-      return value
-    case 'OPEN_REQUEST_LIMIT':
-      return 'TOO_MANY_OPEN_REQUESTS'
+      return true
     default:
-      return null
+      return false
   }
 }
 
 function getServerErrorCode(value: unknown): CreateBookingApiErrorCode | null {
-  if (!isRecord(value) || value.ok !== false || !isRecord(value.error)) {
+  if (
+    !isRecord(value) ||
+    value.ok !== false ||
+    !isRecord(value.error) ||
+    !isServerErrorCode(value.error.code)
+  ) {
     return null
   }
 
-  return readServerErrorCode(value.error.code)
+  return value.error.code
 }
 
 async function readJsonResponse(response: Response): Promise<unknown> {

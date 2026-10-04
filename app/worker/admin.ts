@@ -1,8 +1,6 @@
 import {
   bookingStatuses,
-  getAdminActionsForBooking,
-  isAdminFlowVersion,
-  type AdminApprovalPreview,
+  getAllowedAdminActions,
   type AdminBlockedDate,
   type AdminBlockedDateResponse,
   type AdminBlockedDatesResponse,
@@ -15,25 +13,20 @@ import {
   type AdminBookingsResponse,
   type AdminCustomer,
   type AdminDeleteBlockedDateResponse,
-  type AdminFlowVersion,
   type BookingStatus,
 } from '../shared/admin.js'
 import {
   isBookingPackageSnapshot,
   type BookingPackageSnapshot,
 } from '../shared/booking.js'
-import type { EmailTemplate } from '../shared/notifications.js'
 import {
   authorizeAdminRequest,
   type AdminAuthorizationFailure,
   type AuthenticatedAdmin,
 } from './admin-auth.js'
 import {
-  buildAdminFlowFacts,
-  computeApprovalPreview,
   performAdminBookingAction,
   updateAdminBookingNotes,
-  type FlowTwoApprovalFacts,
 } from './admin-workflow.js'
 import {
   errorResponse,
@@ -45,14 +38,8 @@ import {
 import {
   buildMyBookingsUrl,
   renderCustomerBookingStatusTemplate,
-  renderCustomerFlowTwoApprovalTemplate,
 } from './email-templates.js'
 import { sendEmail } from './email.js'
-import {
-  LATEST_RECEIPT_STATUS_SQL,
-  NOTICE_PROTECTED_COLUMN_SQL,
-} from './jobs/hold-state.js'
-import { readSettingsSnapshot } from './settings/settings-read.js'
 
 const DEFAULT_BOOKING_LIMIT = 50
 const MAXIMUM_BOOKING_LIMIT = 100
@@ -102,34 +89,6 @@ interface AdminBookingRow {
   customerLastName: string
   customerEmail: string
   customerPhone: string
-}
-
-/**
- * The detail row: the list columns plus the flow-2 facts of §3.3 #17, read
- * as unknown because D1 rows are a trust boundary (every value is checked
- * in readBookingFlowColumns before it is used or answered).
- */
-interface AdminBookingDetailRow extends AdminBookingRow {
-  flowVersion: unknown
-  depositAmount: unknown
-  termsVersion: unknown
-  termsAcceptedAt: unknown
-  depositReceivedAmount: unknown
-  depositReceivedAt: unknown
-  latestReceiptStatus: unknown
-  noticeProtected: unknown
-}
-
-/** The same facts, every column checked. */
-interface BookingFlowColumns {
-  readonly flowVersion: AdminFlowVersion
-  readonly depositAmount: number | null
-  readonly termsVersion: string | null
-  readonly termsAcceptedAt: string | null
-  readonly depositReceivedAmount: number | null
-  readonly depositReceivedAt: string | null
-  readonly latestReceiptStatus: string | null
-  readonly noticeProtected: boolean
 }
 
 interface BookingHistoryRow {
@@ -706,49 +665,6 @@ function parseBookingSubresourcePath(
   }
 }
 
-function readOptionalText(value: unknown): string | null {
-  return typeof value === 'string' ? value : null
-}
-
-function isNullableSafeInteger(value: unknown): value is number | null {
-  return value === null || (typeof value === 'number' && Number.isSafeInteger(value))
-}
-
-/**
- * The flow-2 columns of a stored row, each within its CHECK. A value
- * outside it is a broken database, not a request error, and throws like
- * the status check always did.
- */
-function readBookingFlowColumns(row: AdminBookingDetailRow): BookingFlowColumns {
-  const {
-    flowVersion,
-    depositAmount,
-    depositReceivedAmount,
-    noticeProtected,
-  } = row
-
-  if (
-    !isAdminFlowVersion(flowVersion) ||
-    !isNullableSafeInteger(depositAmount) ||
-    !isNullableSafeInteger(depositReceivedAmount) ||
-    (row.termsAcceptedAt !== null && typeof row.termsAcceptedAt !== 'string') ||
-    (noticeProtected !== 0 && noticeProtected !== 1)
-  ) {
-    throw new Error('Stored booking row is invalid')
-  }
-
-  return {
-    flowVersion,
-    depositAmount,
-    termsVersion: readOptionalText(row.termsVersion),
-    termsAcceptedAt: readOptionalText(row.termsAcceptedAt),
-    depositReceivedAmount,
-    depositReceivedAt: readOptionalText(row.depositReceivedAt),
-    latestReceiptStatus: readOptionalText(row.latestReceiptStatus),
-    noticeProtected: noticeProtected === 1,
-  }
-}
-
 function parseHistoryRows(
   rows: BookingHistoryRow[],
 ): AdminBookingStatusHistoryEntry[] {
@@ -775,18 +691,9 @@ function parseHistoryRows(
   return history
 }
 
-/**
- * GET …/{id} (§3.3 #17): the row with its flow-2 facts, `allowedActions`
- * from the flow-aware map of shared/admin.ts (the Worker clock decides the
- * grace rules, never the client's), and for a `pending_review` row the
- * path `approve` will take right now. The latest receipt and the notice
- * protection come from the hold jobs' constant fragments (alias b), so the
- * cron, the queue and this answer agree.
- */
 async function loadAdminBookingDetail(
   env: Env,
   bookingId: string,
-  now: Date = new Date(),
 ): Promise<AdminBookingDetail | null> {
   const booking = await env.DB.prepare(
     `
@@ -801,14 +708,6 @@ async function loadAdminBookingDetail(
         b.confirmed_at AS confirmedAt,
         b.created_at AS createdAt,
         b.updated_at AS updatedAt,
-        b.flow_version AS flowVersion,
-        b.deposit_amount AS depositAmount,
-        b.terms_version AS termsVersion,
-        b.terms_accepted_at AS termsAcceptedAt,
-        b.deposit_received_amount AS depositReceivedAmount,
-        b.deposit_received_at AS depositReceivedAt,
-        ${LATEST_RECEIPT_STATUS_SQL} AS latestReceiptStatus,
-        ${NOTICE_PROTECTED_COLUMN_SQL} AS noticeProtected,
         u.id AS customerId,
         u.first_name AS customerFirstName,
         u.last_name AS customerLastName,
@@ -821,7 +720,7 @@ async function loadAdminBookingDetail(
     `,
   )
     .bind(bookingId)
-    .first<AdminBookingDetailRow>()
+    .first<AdminBookingRow>()
 
   if (!booking) {
     return null
@@ -829,31 +728,6 @@ async function loadAdminBookingDetail(
 
   if (!isBookingStatus(booking.status)) {
     throw new Error('Stored booking status is invalid')
-  }
-
-  const flow = readBookingFlowColumns(booking)
-  const allowedActions = getAdminActionsForBooking(
-    buildAdminFlowFacts(
-      {
-        status: booking.status,
-        flowVersion: flow.flowVersion,
-        eventDate: booking.eventDate,
-        holdExpiresAt: booking.holdExpiresAt,
-        termsAcceptedAt: flow.termsAcceptedAt,
-        latestReceiptStatus: flow.latestReceiptStatus,
-      },
-      now,
-    ),
-  )
-  let approvalPreview: AdminApprovalPreview | null = null
-
-  if (booking.status === 'pending_review') {
-    approvalPreview = computeApprovalPreview(
-      env,
-      await readSettingsSnapshot(env.DB, now),
-      booking,
-      now,
-    )
   }
 
   const historyResult = await env.DB.prepare(
@@ -877,7 +751,7 @@ async function loadAdminBookingDetail(
     id: booking.id,
     eventDate: booking.eventDate,
     status: booking.status,
-    allowedActions,
+    allowedActions: getAllowedAdminActions(booking.status),
     packageName: snapshot?.package.name ?? null,
     estimatedTotal: booking.estimatedTotal,
     packageSnapshot: snapshot,
@@ -889,14 +763,6 @@ async function loadAdminBookingDetail(
     updatedAt: booking.updatedAt,
     customer: toAdminCustomer(booking),
     statusHistory: parseHistoryRows(historyResult.results),
-    flowVersion: flow.flowVersion,
-    depositAmount: flow.depositAmount,
-    termsVersion: flow.termsVersion,
-    termsAcceptedAt: flow.termsAcceptedAt,
-    depositReceivedAmount: flow.depositReceivedAmount,
-    depositReceivedAt: flow.depositReceivedAt,
-    noticeProtected: flow.noticeProtected,
-    approvalPreview,
   }
 
   return detail
@@ -1373,82 +1239,33 @@ async function resolveStatusEmailRecipient(
   }
 }
 
-/** What the status email of one committed transition says and is keyed by. */
-interface BookingStatusEmail {
-  readonly template: EmailTemplate
-  readonly idempotencyKey: string
-}
-
-/**
- * The status email for a transition that changed the status. A flow-1 row
- * gets exactly the copy and the key it always got (N-29). A flow-2 row
- * that now holds a deadline (an approval, a reinstatement) gets the flow-2
- * copy with the deadline and the deposit (B1 #5), and a flow-2 key that
- * carries the transition instant, so a hold expired and reinstated twice
- * is never deduplicated into silence by the provider (D14). Null when the
- * flow-2 copy cannot be rendered from the row; nothing is sent then.
- */
-function renderBookingStatusEmail(
-  booking: AdminBookingDetail,
-  previousStatus: BookingStatus,
-  newStatus: BookingStatus,
-  flowTwoApproval: FlowTwoApprovalFacts | null,
-  myBookingsUrl: string,
-): BookingStatusEmail | null {
-  const legacyKey = `booking-status:${booking.id}:${previousStatus}:${newStatus}`
-
-  if (booking.flowVersion !== 2) {
-    return {
-      template: renderCustomerBookingStatusTemplate({
-        customerFirstName: booking.customer.firstName,
-        bookingReference: booking.id,
-        eventDate: booking.eventDate,
-        previousStatus,
-        newStatus,
-        myBookingsUrl,
-      }),
-      idempotencyKey: legacyKey,
-    }
-  }
-
-  const idempotencyKey = `${legacyKey}:${booking.updatedAt}`
-
-  if (flowTwoApproval === null) {
-    return {
-      template: renderCustomerBookingStatusTemplate({
-        customerFirstName: booking.customer.firstName,
-        bookingReference: booking.id,
-        eventDate: booking.eventDate,
-        previousStatus,
-        newStatus,
-        myBookingsUrl,
-      }),
-      idempotencyKey,
-    }
-  }
-
-  const template = renderCustomerFlowTwoApprovalTemplate({
-    customerFirstName: booking.customer.firstName,
-    bookingReference: booking.id,
-    eventDate: booking.eventDate,
-    holdExpiresAt: flowTwoApproval.holdExpiresAt,
-    depositAmount: flowTwoApproval.depositAmount,
-    myBookingsUrl,
-  })
-
-  return template === null ? null : { template, idempotencyKey }
-}
-
 async function deliverBookingStatusNotification(
   env: Env,
+  booking: AdminBookingDetail,
   recipient: string,
-  email: BookingStatusEmail,
+  previousStatus: BookingStatus,
+  newStatus: BookingStatus,
 ): Promise<void> {
   try {
+    const myBookingsUrl = buildMyBookingsUrl(env.APP_BASE_URL)
+
+    if (!myBookingsUrl) {
+      return
+    }
+
+    const template = renderCustomerBookingStatusTemplate({
+      customerFirstName: booking.customer.firstName,
+      bookingReference: booking.id,
+      eventDate: booking.eventDate,
+      previousStatus,
+      newStatus,
+      myBookingsUrl,
+    })
     const deliveryResult = await sendEmail(env, {
       to: recipient,
-      ...email.template,
-      idempotencyKey: email.idempotencyKey,
+      ...template,
+      idempotencyKey:
+        `booking-status:${booking.id}:${previousStatus}:${newStatus}`,
     })
 
     if (deliveryResult.status === 'failed') {
@@ -1466,11 +1283,7 @@ async function deliverBookingStatusNotification(
   }
 }
 
-/**
- * True when the email was rendered and handed to waitUntil. Rendering runs
- * here, before the answer, so `customerEmailQueued` is never true for an
- * email that could not be built.
- */
+/** True when the email was handed to waitUntil. */
 function scheduleBookingStatusNotification(
   ctx: ExecutionContext,
   env: Env,
@@ -1478,30 +1291,17 @@ function scheduleBookingStatusNotification(
   recipient: string,
   previousStatus: BookingStatus,
   newStatus: BookingStatus,
-  flowTwoApproval: FlowTwoApprovalFacts | null,
 ): boolean {
-  const myBookingsUrl = buildMyBookingsUrl(env.APP_BASE_URL)
-
-  if (!myBookingsUrl) {
-    return false
-  }
-
-  const email = renderBookingStatusEmail(
-    booking,
-    previousStatus,
-    newStatus,
-    flowTwoApproval,
-    myBookingsUrl,
-  )
-
-  if (email === null) {
-    console.error('BOOKING_STATUS_NOTIFICATION_FAILED')
-
-    return false
-  }
-
   try {
-    ctx.waitUntil(deliverBookingStatusNotification(env, recipient, email))
+    ctx.waitUntil(
+      deliverBookingStatusNotification(
+        env,
+        booking,
+        recipient,
+        previousStatus,
+        newStatus,
+      ),
+    )
 
     return true
   } catch (error) {
@@ -1574,27 +1374,17 @@ export async function handleAdminRequest(
         return bookingNotFoundResponse()
       }
 
-      // No status email when the status did not change (`extend_hold`,
-      // D14): that transition queued its own `hold_extended` copy in the
-      // batch, and reports whether it did.
-      let customerEmailQueued = result.outboxEmailQueued
-
-      if (result.previousStatus !== result.newStatus) {
-        const recipient = await resolveStatusEmailRecipient(env, booking.id)
-
-        customerEmailQueued =
-          recipient !== null &&
-          scheduleBookingStatusNotification(
-            ctx,
-            env,
-            booking,
-            recipient,
-            result.previousStatus,
-            result.newStatus,
-            result.flowTwoApproval,
-          )
-      }
-
+      const recipient = await resolveStatusEmailRecipient(env, booking.id)
+      const customerEmailQueued =
+        recipient !== null &&
+        scheduleBookingStatusNotification(
+          ctx,
+          env,
+          booking,
+          recipient,
+          result.previousStatus,
+          result.newStatus,
+        )
       const response: AdminBookingActionResult = {
         ok: true,
         booking,
@@ -1608,7 +1398,6 @@ export async function handleAdminRequest(
     const result = await updateAdminBookingNotes(
       request,
       env,
-      authorization.admin,
       bookingSubresource.bookingId,
     )
 

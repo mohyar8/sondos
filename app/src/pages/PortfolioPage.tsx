@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import ResponsiveImage from '../components/ResponsiveImage'
 import {
   portfolioCategories,
@@ -19,6 +20,12 @@ import {
 import Lightbox from './portfolio/Lightbox'
 import ContactSection from './sections/ContactSection'
 import './PortfolioPage.css'
+import DisplayHeading from '../components/DisplayHeading'
+import {
+  canUseViewTransition,
+  ignoreSkippedTransition,
+  isCinematicDesign,
+} from '../design/runtime'
 
 const PORTFOLIO_INQUIRY_URL = buildWhatsAppUrl(PORTFOLIO_INQUIRY_MESSAGE)
 
@@ -108,6 +115,31 @@ export default function PortfolioPage({ onNavigate }: PortfolioPageProps) {
   const focusReturnIdRef = useRef<string | null>(null)
   const [activeFilter, setActiveFilter] = useState<PortfolioFilter>('all')
   const [openImageId, setOpenImageId] = useState<string | null>(null)
+  const morphTiles = isCinematicDesign()
+
+  // Cinematic: the photos glide to their new places when the filter changes
+  // (View Transitions; each tile is named after its photo). Elsewhere the
+  // grid simply updates.
+  function changeFilter(nextFilter: PortfolioFilter) {
+    if (nextFilter === activeFilter) {
+      return
+    }
+
+    if (!canUseViewTransition()) {
+      setActiveFilter(nextFilter)
+      return
+    }
+
+    const root = document.documentElement
+    root.setAttribute('data-cine-vt', 'filter')
+    const transition = document.startViewTransition(() => {
+      flushSync(() => setActiveFilter(nextFilter))
+    })
+    transition.ready.catch(ignoreSkippedTransition)
+    transition.finished
+      .catch(ignoreSkippedTransition)
+      .finally(() => root.removeAttribute('data-cine-vt'))
+  }
   const tileHintId = useId()
 
   useReveal(mainRef)
@@ -164,7 +196,7 @@ export default function PortfolioPage({ onNavigate }: PortfolioPageProps) {
         <div className="container--wide">
           <header className="section-heading">
             <p className="eyebrow">معرض الأعمال</p>
-            <h1 id="portfolio-title">من أعمالنا</h1>
+            <DisplayHeading as="h1" id="portfolio-title" text="من أعمالنا" ornament />
             <p>
               مختارات من لحظات حقيقية صُوّرت بعناية واهتمام بالتفاصيل، ولا
               تُكشف فيها هوية أي عروس إلا بإذنها.
@@ -185,7 +217,7 @@ export default function PortfolioPage({ onNavigate }: PortfolioPageProps) {
                   type="button"
                   className="portfolio-filter__option"
                   aria-pressed={isActive}
-                  onClick={() => setActiveFilter(option.id)}
+                  onClick={() => changeFilter(option.id)}
                 >
                   <CheckIcon />
                   {option.label}
@@ -214,6 +246,11 @@ export default function PortfolioPage({ onNavigate }: PortfolioPageProps) {
                 <li
                   key={image.id}
                   className={`portfolio-grid__item ${layout.modifier} reveal`}
+                  style={
+                    morphTiles
+                      ? { viewTransitionName: `pt-${image.id}` }
+                      : undefined
+                  }
                 >
                   <button
                     type="button"

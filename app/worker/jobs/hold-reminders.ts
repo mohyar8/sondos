@@ -14,12 +14,6 @@ import {
   type OutboxRowError,
 } from '../notify/outbox.js'
 import {
-  getReceiptChannel,
-  readHoldAutoExpiry,
-  type ReceiptChannel,
-} from '../settings/features.js'
-import { ONLINE_CONFIRMATION_SWITCH_ON_SQL } from '../settings/settings-read.js'
-import {
   JOB_LIMITS,
   JobFailure,
   type JobContext,
@@ -27,8 +21,6 @@ import {
 } from './job-types.js'
 import {
   LATEST_RECEIPT_STATUS_SQL,
-  NOTICE_PROTECTED_COLUMN_SQL,
-  NOTICE_PROTECTED_SQL,
   OWED_HOLD_PREDICATE_SQL,
   isCanonicalInstant,
   isRecord,
@@ -38,24 +30,12 @@ import {
 
 /**
  * The `hold-reminders` job (ADR-001 §2.2, every 15 minutes, after
- * hold-expiry and before the outbox drain, so one tick sends what it queues;
- * plan 11 B1, H3, TM-15).
+ * hold-expiry and before the outbox drain, so one tick sends what it queues).
  *
  * While she still owes a receipt (hold-state.ts), two reminders are due
  * before `hold_expires_at`: 24 h and 6 h (TIMING.holdReminderOffsetsMs). A
  * reminder is queued only when its due time <= now < the deadline, and only
  * inside the 09:00–21:00 Riyadh send window (TIMING.sendWindowRiyadh).
- * - Reminders follow automatic expiry: they are queued only while AX = EM ∧
- *   OCe (worker/settings/features.ts). Without an email provider nothing
- *   could be sent; with the kill switch pulled the confirmation routes
- *   answer 503, so a reminder would send her to steps she cannot take, and
- *   the hold does not lapse on its own either. While AX is off, reminders
- *   already queued for the current deadline are superseded.
- * - A notice-protected hold (she has told us she transferred the deposit)
- *   gets no reminder, and any still pending is superseded (B1, UX-02).
- * - The copy names what she still owes (emails/hold.ts): accept the terms;
- *   transfer and send the receipt on WhatsApp; or upload the receipt, the
- *   last only while receipt uploads are open (PM, getReceiptChannel).
  * - If both are due (a missed tick, or a window that opened late), only the
  *   6 h one is sent and the 24 h one is recorded as `superseded`.
  * - A reminder that fell due before the current deadline was set by a
@@ -63,24 +43,14 @@ import {
  *   email that set the deadline already states it (for example, a rejection
  *   that leaves exactly 24 h would otherwise trigger the 24 h reminder at
  *   once).
- * - Dedupe keys are `<kind>:<bookingId>:<hold_expires_at>` (no personal
- *   data), so a new deadline re-arms both reminders, and a re-run never
- *   queues twice.
- * - The insert re-checks inside the same statement everything its copy and
- *   its sending depend on (TM-15): the status, the deadline, whether the
- *   terms are accepted, that she still owes a receipt, that no notice for
- *   this deadline exists and that the kill switch is on. A receipt, a
- *   notice or an acceptance meanwhile queues nothing; the next tick
- *   re-plans from the new state.
- *
- * Neither job claims rows: every write is a conditional statement keyed on
- * the state it read, so an overlapping tick changes nothing twice (the
- * outbox drain owns the claim, TM-15).
+ * - Dedupe keys are `<kind>:<bookingId>:<hold_expires_at>`, so a new
+ *   deadline re-arms both reminders, and a re-run never queues twice.
+ * - The insert re-checks the booking's state and deadline inside the same
+ *   statement, so a receipt uploaded meanwhile queues nothing.
  *
  * Selection is by state (a deadline within the next 24 h), so a missed tick
- * catches up; bookings whose 6 h reminder is already recorded drop out, and
- * a protected hold (or any hold while AX is off) is selected only while one
- * of its reminders is still pending. Logs carry fixed codes and counts only.
+ * catches up; bookings whose 6 h reminder is already recorded drop out.
+ * Logs carry fixed codes and counts only.
  */
 
 interface HoldReminderStep {
@@ -105,8 +75,6 @@ export const HOLD_REMINDER_LIMITS = {
 /** What the job knows about one hold's reminders for its current deadline. */
 export interface HoldReminderFacts {
   readonly holdExpiresAtMs: number
-  /** A `deposit_notice_sent` event exists for this deadline (B1). */
-  readonly noticeProtected: boolean
   /**
    * When a receipt rejection or an extension last set the deadline (its own
    * email states the new deadline); null when the approval set it.
@@ -114,14 +82,6 @@ export interface HoldReminderFacts {
   readonly deadlineSetAtMs: number | null
   /** notification_log status of each reminder for this deadline; null = no row. */
   readonly recorded: Readonly<Record<HoldReminderKind, NotificationStatus | null>>
-}
-
-/** What may be sent at this instant. */
-export interface HoldReminderSendState {
-  /** AX = EM ∧ OCe for this tick: reminders may be queued at all. */
-  readonly remindersOn: boolean
-  /** Inside the 09:00–21:00 Riyadh send window. */
-  readonly inSendWindow: boolean
 }
 
 export interface HoldReminderPlan {
@@ -140,24 +100,14 @@ function isOpenStatus(status: NotificationStatus | null): boolean {
 /**
  * Decides what to do for one hold at `nowMs` (pure). Only the most urgent
  * due reminder may be sent; every other due reminder that is still open is
- * superseded. Nothing is sent outside the send window or while reminders
- * are off, but superseding does not wait for either. A notice-protected
- * hold, or any hold while reminders are off, only has its pending
- * reminders superseded.
+ * superseded. Nothing is sent outside the send window, but superseding does
+ * not wait for it.
  */
 export function planHoldReminder(
   facts: HoldReminderFacts,
   nowMs: number,
-  sendState: HoldReminderSendState,
+  inSendWindow: boolean,
 ): HoldReminderPlan {
-  if (facts.noticeProtected || !sendState.remindersOn) {
-    const pending = HOLD_REMINDER_STEPS.filter(
-      (step) => facts.recorded[step.kind] === 'pending',
-    ).map((step) => step.kind)
-
-    return pending.length === 0 ? NOTHING_TO_DO : { send: null, supersede: pending }
-  }
-
   const remainingMs = facts.holdExpiresAtMs - nowMs
 
   if (
@@ -190,7 +140,7 @@ export function planHoldReminder(
     .map((step) => step.kind)
 
   const send =
-    sendState.inSendWindow &&
+    inSendWindow &&
     !coveredByDeadlineEmail(mostUrgent) &&
     facts.recorded[mostUrgent.kind] === null
       ? mostUrgent.kind
@@ -242,7 +192,6 @@ export function readHoldReminderCandidate(
     hold,
     facts: {
       holdExpiresAtMs: hold.holdExpiresAtMs,
-      noticeProtected: hold.noticeProtected,
       deadlineSetAtMs: deadlineSetAt === null ? null : Date.parse(deadlineSetAt),
       recorded: {
         hold_reminder_24h: reminder24h,
@@ -256,15 +205,11 @@ export type HoldReminderRowResult =
   | { readonly ok: true; readonly row: OutboxRow }
   | { readonly ok: false; readonly code: OutboxRowError | 'NO_RECIPIENT' | 'UNRENDERABLE' }
 
-/**
- * The outbox row for one reminder, anchored on the hold's deadline, in the
- * copy for what she still owes and where her receipt goes.
- */
+/** The outbox row for one reminder, anchored on the hold's deadline. */
 export function buildHoldReminderOutboxRow(
   hold: OwedHold,
   kind: HoldReminderKind,
   appBaseUrl: string | undefined,
-  receiptChannel: ReceiptChannel,
 ): HoldReminderRowResult {
   if (hold.customerEmail === null) {
     return { ok: false, code: 'NO_RECIPIENT' }
@@ -277,7 +222,6 @@ export function buildHoldReminderOutboxRow(
     eventDate: hold.eventDate,
     holdExpiresAt: hold.holdExpiresAt,
     owedStep: hold.owedStep,
-    receiptChannel,
     appBaseUrl,
   })
 
@@ -297,8 +241,6 @@ export function buildHoldReminderOutboxRow(
 }
 
 export interface HoldReminderSummary {
-  /** AX was on for this tick (reminders may be queued). */
-  readonly remindersOn: boolean
   readonly selected: number
   readonly queued: number
   readonly superseded: number
@@ -318,10 +260,7 @@ export interface HoldReminderOptions {
 // The reminder rows for the CURRENT deadline, looked up by primary key. The
 // key is '<kind>:<bookingId>:<hold_expires_at>' (outbox.ts buildDedupeKey);
 // the lookup only avoids repeated work, the primary key is what dedupes.
-// While reminders are on, an unprotected hold is selected until its 6 h
-// reminder is recorded; a protected hold, or any hold while they are off,
-// only while one of its reminders is still pending (to supersede it).
-// ?1 now | ?2 now + 24 h | ?3 max rows | ?4 reminders on (1) or off (0)
+// ?1 now | ?2 now + 24 h | ?3 max rows
 const SELECT_CANDIDATES_SQL = `
   SELECT
     b.id,
@@ -329,9 +268,7 @@ const SELECT_CANDIDATES_SQL = `
     b.status,
     b.event_date,
     b.hold_expires_at,
-    b.terms_accepted_at,
     ${LATEST_RECEIPT_STATUS_SQL} AS latest_receipt_status,
-    ${NOTICE_PROTECTED_COLUMN_SQL} AS notice_protected,
     (
       SELECT MAX(e.created_at)
       FROM booking_events AS e
@@ -343,11 +280,7 @@ const SELECT_CANDIDATES_SQL = `
       FROM notification_log AS n
       WHERE n.dedupe_key = 'hold_reminder_24h:' || b.id || ':' || b.hold_expires_at
     ) AS reminder_24h_status,
-    (
-      SELECT n.status
-      FROM notification_log AS n
-      WHERE n.dedupe_key = 'hold_reminder_6h:' || b.id || ':' || b.hold_expires_at
-    ) AS reminder_6h_status,
+    NULL AS reminder_6h_status,
     CASE WHEN u.erased_at IS NULL AND u.email_verified_at IS NOT NULL THEN u.email END AS customer_email,
     CASE WHEN u.erased_at IS NULL THEN u.first_name END AS customer_first_name
   FROM booking_requests AS b
@@ -355,22 +288,11 @@ const SELECT_CANDIDATES_SQL = `
   WHERE ${OWED_HOLD_PREDICATE_SQL}
     AND b.hold_expires_at > ?1
     AND b.hold_expires_at <= ?2
-    AND CASE
-      WHEN ?4 = 1 AND NOT ${NOTICE_PROTECTED_SQL} THEN NOT EXISTS (
-        SELECT 1
-        FROM notification_log AS n6
-        WHERE n6.dedupe_key = 'hold_reminder_6h:' || b.id || ':' || b.hold_expires_at
-      )
-      ELSE EXISTS (
-        SELECT 1
-        FROM notification_log AS np
-        WHERE np.dedupe_key IN (
-            'hold_reminder_24h:' || b.id || ':' || b.hold_expires_at,
-            'hold_reminder_6h:' || b.id || ':' || b.hold_expires_at
-          )
-          AND np.status = 'pending'
-      )
-    END
+    AND NOT EXISTS (
+      SELECT 1
+      FROM notification_log AS n6
+      WHERE n6.dedupe_key = 'hold_reminder_6h:' || b.id || ':' || b.hold_expires_at
+    )
   ORDER BY b.hold_expires_at, b.id
   LIMIT ?3
 `
@@ -401,14 +323,10 @@ const SUPERSEDE_SQL = `
   WHERE notification_log.status = 'pending'
 `
 
-// Queues one reminder only while, in the same statement, the booking is in
-// the state its copy was written for: the same status and deadline, terms
-// accepted or not as read, still owing a receipt, no notice for this
-// deadline, and the kill switch on (TM-15). Binds the prepareOutboxRow()
-// fields.
+// Queues one reminder only while the booking still owes a receipt for the
+// same deadline, in the same statement. Binds the prepareOutboxRow() fields.
 // ?1 dedupe key | ?2 booking id | ?3 kind | ?4 recipient | ?5 payload
-// ?6 now | ?7 the deadline the reminder is for | ?8 status it was read in
-// ?9 terms accepted when read (1) or not (0)
+// ?6 now | ?7 the deadline the reminder is for
 const QUEUE_SQL = `
   INSERT INTO notification_log (
     dedupe_key,
@@ -426,11 +344,7 @@ const QUEUE_SQL = `
   WHERE b.id = ?2
     AND b.hold_expires_at = ?7
     AND b.hold_expires_at > ?6
-    AND b.status = ?8
-    AND (CASE WHEN b.terms_accepted_at IS NULL THEN 0 ELSE 1 END) = ?9
     AND ${OWED_HOLD_PREDICATE_SQL}
-    AND NOT ${NOTICE_PROTECTED_SQL}
-    AND ${ONLINE_CONFIRMATION_SWITCH_ON_SQL}
   ON CONFLICT (dedupe_key) DO NOTHING
 `
 
@@ -447,7 +361,6 @@ async function applyPlan(
   plan: HoldReminderPlan,
   nowIso: string,
   appBaseUrl: string | undefined,
-  receiptChannel: ReceiptChannel,
 ): Promise<ReminderBatchResult> {
   const { hold } = candidate
   const statements: D1PreparedStatement[] = []
@@ -470,12 +383,7 @@ async function applyPlan(
   let queueIndex: number | null = null
 
   if (plan.send !== null) {
-    const email = buildHoldReminderOutboxRow(
-      hold,
-      plan.send,
-      appBaseUrl,
-      receiptChannel,
-    )
+    const email = buildHoldReminderOutboxRow(hold, plan.send, appBaseUrl)
 
     if (email.ok) {
       queueIndex = statements.length
@@ -488,8 +396,6 @@ async function applyPlan(
           email.row.payload,
           nowIso,
           hold.holdExpiresAt,
-          hold.status,
-          hold.termsAccepted ? 1 : 0,
         ),
       )
     } else {
@@ -525,7 +431,7 @@ async function applyPlan(
 
 /**
  * One bounded reminder pass. Throws JobFailure for an unusable clock and lets
- * a D1 error on the switch read or the select propagate.
+ * a D1 error on the select propagate.
  */
 export async function queueDueHoldReminders(
   env: Env,
@@ -544,23 +450,17 @@ export async function queueDueHoldReminders(
       HOLD_REMINDER_LIMITS.maxBookingsPerTick,
     ),
   )
-  const remindersOn = await readHoldAutoExpiry(env, env.DB)
-  const receiptChannel = getReceiptChannel(env)
   const selected = await env.DB.prepare(SELECT_CANDIDATES_SQL)
     .bind(
       options.nowIso,
       addMsToInstant(now, LARGEST_REMINDER_OFFSET_MS),
       limit,
-      remindersOn ? 1 : 0,
     )
     .all<unknown>()
   const candidates = selected.results
     .map(readHoldReminderCandidate)
     .filter((candidate) => candidate !== null)
-  const sendState: HoldReminderSendState = {
-    remindersOn,
-    inSendWindow: isWithinSendWindow(now),
-  }
+  const inSendWindow = isWithinSendWindow(now)
 
   let queued = 0
   let superseded = 0
@@ -574,7 +474,7 @@ export async function queueDueHoldReminders(
       break
     }
 
-    const plan = planHoldReminder(candidate.facts, now.getTime(), sendState)
+    const plan = planHoldReminder(candidate.facts, now.getTime(), inSendWindow)
 
     if (plan.send === null && plan.supersede.length === 0) {
       continue
@@ -586,7 +486,6 @@ export async function queueDueHoldReminders(
       plan,
       options.nowIso,
       options.appBaseUrl,
-      receiptChannel,
     )
 
     queued += result.queued
@@ -596,7 +495,6 @@ export async function queueDueHoldReminders(
   }
 
   return {
-    remindersOn,
     selected: candidates.length,
     queued,
     superseded,
@@ -613,12 +511,10 @@ async function runHoldRemindersJob(context: JobContext): Promise<void> {
     appBaseUrl: context.env.APP_BASE_URL,
   })
 
-  if (summary.queued > 0) {
-    console.log(`HOLD_REMINDERS_QUEUED count=${summary.queued}`)
-  }
-
-  if (summary.superseded > 0) {
-    console.log(`HOLD_REMINDERS_SUPERSEDED count=${summary.superseded}`)
+  if (summary.queued + summary.superseded > 0) {
+    console.log(
+      `HOLD_REMINDERS_DONE queued=${summary.queued} superseded=${summary.superseded}`,
+    )
   }
 
   if (summary.halted) {

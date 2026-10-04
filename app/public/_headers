@@ -6,45 +6,21 @@
 # as the SPA fallback for /, /portfolio, /packages, /my-bookings and /admin.
 # Cloudflare merges this rule with the more specific ones below.
 #
-# This file is checked on every `vite` and `vite build` by the config guard
-# (vite.config.ts + scripts/config-guard.mjs; plan 11 W2-18, N-53): the main
-# policy must stay Content-Security-Policy-Report-Only here, carry the hash of
-# the one inline script in index.html, allow the build's Firebase auth domain
-# in frame-src and report to /api/csp-report; COOP, X-Frame-Options, nosniff,
-# Reporting-Endpoints and the Trusted Types header must be present. A build
-# that fails any of these is refused with the variable names only.
-#
-# The main CSP ships as Content-Security-Policy-Report-Only (TM-14, C-10):
-# deploy, then open the site on desktop Chrome, iOS Safari and Android and
-# check the console for "[Report Only]" violations (sign-in, registration,
-# password reset, email verification). Browsers also POST each violation to
-# /api/csp-report (report-to through Reporting-Endpoints, report-uri for the
-# older mechanism), where the Worker keeps only a count per day, directive and
-# blocked origin (csp_report_counts). Never rename the header by hand: the
-# enforced trial on the preview Worker is a build with CSP_MODE=enforce, which
-# rewrites the built copy of this file to Content-Security-Policy plus
-# upgrade-insecure-requests (browsers ignore that directive, with a console
-# warning, in a Report-Only policy); production enforcement is W7-01's release
-# (within 7 days of the first deploy), which switches this source file.
+# The CSP ships as Content-Security-Policy-Report-Only first: deploy, then open
+# the site on desktop Chrome, iOS Safari and Android and check the console for
+# "[Report Only]" violations (sign-in, registration, password reset, email
+# verification). Rename the header to Content-Security-Policy once it is clean,
+# and append "; upgrade-insecure-requests" then (browsers ignore that directive,
+# with a console warning, in a Report-Only policy).
 # Before enforcing:
-#   - the auth domain (VITE_FIREBASE_AUTH_DOMAIN) must be in frame-src; the
-#     config guard refuses a build whose auth domain is missing here, so a new
-#     Firebase project (decision D16) means editing this line in the same change;
+#   - confirm the authDomain (VITE_FIREBASE_AUTH_DOMAIN) matches frame-src; it is
+#     assumed to be the default for project sundus-yar-website;
 #   - drop the reCAPTCHA sources if reCAPTCHA Enterprise enforcement is off in
 #     the Firebase project; add 'unsafe-inline' to style-src only if a
 #     Report-Only violation shows the reCAPTCHA badge needs it;
 #   - the 'sha256-…' source allows the one inline script in index.html (the
 #     home-page hero preload). Editing that script changes its hash: recompute
-#     it (sha256 of the exact text between <script> and </script>, base64); the
-#     config guard prints the expected value when it no longer matches.
-# img-src allows blob: besides 'self': receipts and gallery photos reach the
-# SPA as blobs through the API client and are shown from object URLs; data:
-# is not allowed (build.assetsInlineLimit is 0 and the verify script refuses a
-# data:image in the build output).
-# The second Report-Only header, require-trusted-types-for 'script', stays a
-# separate policy in both modes (TM-14): it is enforced only after a clean
-# Report-Only period shows Firebase does not violate it. Cloudflare joins
-# repeated header lines with a comma, which CSP reads as two policies.
+#     it (sha256 of the exact text between <script> and </script>, base64).
 # Cross-Origin-Opener-Policy: same-origin (audit SEC-12) cuts the link between
 # this site and any window that opened it or that it opens, so another page
 # cannot navigate a signed-in /admin tab to a look-alike sign-in (reverse
@@ -57,9 +33,7 @@
 # After deploying, `curl -sI https://<prod-host>/admin` must show these headers
 # on the SPA-fallback response.
 /*
-  Reporting-Endpoints: csp="/api/csp-report"
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'sha256-jNVT6TGjVN4dSmYJXmdcf7bMRJ0Iim1BVq+0kU6A4Lo=' https://apis.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src https://sundus-yar-website.firebaseapp.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri /api/csp-report; report-to csp
-  Content-Security-Policy-Report-Only: require-trusted-types-for 'script'; report-uri /api/csp-report; report-to csp
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'sha256-jNVT6TGjVN4dSmYJXmdcf7bMRJ0Iim1BVq+0kU6A4Lo=' https://apis.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self'; font-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src https://sundus-yar-website.firebaseapp.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

@@ -115,8 +115,8 @@ function seeded(uid = TESTER) {
 const EXPECTED_STAGES = {
   '01': ['pending_review', null],
   '02': ['approved_hold', null],
-  '03': ['approved_hold', 'deposit_reported'],
-  '04': ['approved_hold', 'deposit_reported'],
+  '03': ['approved_hold', null],
+  '04': ['approved_hold', null],
   '05': ['approved_hold', null],
   '06': [null, 'terminal_status'],
   '07': ['receipt_review', null],
@@ -138,7 +138,7 @@ const EXPECTED_STAGES = {
   '23': [null, 'terminal_status'],
   '24': [null, 'terminal_status'],
   // Fix round 1: states the admin queue and /me name (awaiting_deposit is a /me sub-state, W2-16).
-  '32': ['approved_hold', 'awaiting_deposit'],
+  '32': ['approved_hold', null],
   '33': ['handover_scheduling', 'handover_missed'],
   '34': ['gallery_open', null],
 }

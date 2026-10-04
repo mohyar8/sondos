@@ -1,3 +1,4 @@
+import DisplayHeading from '../../components/DisplayHeading'
 interface Difference {
   readonly title: string
   readonly text: string
@@ -36,7 +37,7 @@ export default function DifferenceSection() {
       <div className="container">
         <header className="section-heading reveal">
           <p className="eyebrow">لماذا سندس يار</p>
-          <h2 id="home-difference-title">أسلوب مبني على التفاصيل والخصوصية</h2>
+          <DisplayHeading id="home-difference-title" text="أسلوب مبني على التفاصيل والخصوصية" ornament />
         </header>
 
         <ul className="home-difference__grid" role="list">

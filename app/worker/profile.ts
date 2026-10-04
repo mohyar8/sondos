@@ -1,4 +1,4 @@
-import { normalizePersonName, toAsciiDigits } from '../shared/text.js'
+import { normalizePersonName } from '../shared/text.js'
 import {
   authenticateFirebaseRequest,
   type AuthenticatedFirebaseUser,
@@ -11,7 +11,6 @@ import {
   readBoundedJson,
 } from './http.js'
 import { isRateLimited, rateLimitedResponse } from './rate-limit.js'
-import { requireRecentCustomerSignIn } from './recent-auth.js'
 import {
   accountErasedResponse,
   checkCustomerAccount,
@@ -88,9 +87,7 @@ function normalizePhone(value: unknown): string | null {
     return null
   }
 
-  // UX-07: a number typed on an Arabic keyboard (Arabic-Indic or Persian
-  // digits) is the same number.
-  const trimmedValue = toAsciiDigits(value).trim()
+  const trimmedValue = value.trim()
 
   if (
     trimmedValue.length === 0 ||
@@ -205,26 +202,6 @@ async function findProfile(
     .first<UserProfileRow>()
 }
 
-/**
- * TM-08, C-4: true when the write changes the phone of an existing row, or
- * moves a customer row to another address (NOCASE, like users.email). The
- * same rule as the contact CASE in the upsert, which decides again inside
- * the write; a case-only change of the address is not a new contact.
- */
-function changesContact(
-  stored: UserProfileRow,
-  phone: string,
-  email: string,
-  emailProven: boolean,
-): boolean {
-  return (
-    stored.phone !== phone ||
-    (emailProven &&
-      stored.role === 'customer' &&
-      !isSameEmailAddress(stored.email, email))
-  )
-}
-
 function unauthorizedResponse(): Response {
   return errorResponse(
     401,
@@ -302,14 +279,6 @@ async function handleGetProfile(
  *   booking-less customer row (same batch). Any other holder of the address
  *   makes the write a no-op and the answer 409 EMAIL_ALREADY_IN_USE.
  * - An erased row is never written: 410 ACCOUNT_ERASED.
- * - Contact changes (TM-08, C-4): a new phone, or a new address, on an
- *   existing row needs a sign-in at most RECENT_SIGN_IN_GUARD_SECONDS old
- *   (CO+R, 403 REAUTH_REQUIRED) and stamps `contact_changed_at`, which the
- *   admin compares with a booking's `created_at`. The upsert decides both
- *   again from the row it updates, so a phone that changed after the read
- *   is still guarded and stamped. Creating the row is not a change: the
- *   first phone and address need no recent sign-in and leave the stamp
- *   NULL. Name-only saves never need one.
  */
 async function handlePutProfile(
   request: Request,
@@ -354,25 +323,7 @@ async function handlePutProfile(
   const email = nextStoredEmail(identity, account)
   const emailProven =
     identity.emailVerified && isSameEmailAddress(email, identity.email)
-  // One instant for both stamps; toISOString() is the 24-character form
-  // the D1 CHECK on contact_changed_at requires.
-  const writtenAt = new Date().toISOString()
-  const verifiedAt = emailProven ? writtenAt : null
-  const { phone } = parsedUpdate.value
-  const reauthRefusal = requireRecentCustomerSignIn(identity)
-  const stored = account ? await findProfile(env, identity.uid) : null
-
-  if (
-    reauthRefusal &&
-    stored &&
-    changesContact(stored, phone, email, emailProven)
-  ) {
-    return reauthRefusal
-  }
-
-  // The contact CASE and the CO+R predicate below read the row being
-  // updated (changesContact is their pre-check): a changed phone, or a
-  // verified customer row moving to another address (NOCASE).
+  const verifiedAt = emailProven ? new Date().toISOString() : null
   const upsertStatement = env.DB.prepare(
     `
       INSERT INTO users (
@@ -406,32 +357,11 @@ async function handlePutProfile(
             THEN users.email_verified_at
           ELSE excluded.email_verified_at
         END,
-        contact_changed_at = CASE
-          WHEN users.phone <> excluded.phone
-            OR (
-              users.role = 'customer'
-              AND excluded.email_verified_at IS NOT NULL
-              AND users.email <> excluded.email COLLATE NOCASE
-            )
-            THEN ?
-          ELSE users.contact_changed_at
-        END,
         first_name = excluded.first_name,
         last_name = excluded.last_name,
         phone = excluded.phone,
         updated_at = CURRENT_TIMESTAMP
       WHERE users.erased_at IS NULL
-        AND (
-          ? = 1
-          OR (
-            users.phone = excluded.phone
-            AND NOT (
-              users.role = 'customer'
-              AND excluded.email_verified_at IS NOT NULL
-              AND users.email <> excluded.email COLLATE NOCASE
-            )
-          )
-        )
     `,
   ).bind(
     identity.uid,
@@ -439,11 +369,9 @@ async function handlePutProfile(
     verifiedAt,
     parsedUpdate.value.firstName,
     parsedUpdate.value.lastName,
-    phone,
+    parsedUpdate.value.phone,
     email,
     identity.uid,
-    writtenAt,
-    reauthRefusal ? 0 : 1,
   )
   const takesNewAddress =
     emailProven && (!account || !isSameEmailAddress(account.email, email))
@@ -458,24 +386,9 @@ async function handlePutProfile(
   if ((results.at(-1)?.meta.changes ?? 0) !== 1) {
     const current = await loadUserAccount(env.DB, identity.uid)
 
-    if (current && current.erasedAt !== null) {
-      return accountErasedResponse()
-    }
-
-    // The row changed between the read and the write (another tab), so this
-    // save became a contact change after the pre-check.
-    const currentProfile =
-      reauthRefusal && current ? await findProfile(env, identity.uid) : null
-
-    if (
-      reauthRefusal &&
-      currentProfile &&
-      changesContact(currentProfile, phone, email, emailProven)
-    ) {
-      return reauthRefusal
-    }
-
-    return emailConflictResponse()
+    return current && current.erasedAt !== null
+      ? accountErasedResponse()
+      : emailConflictResponse()
   }
 
   const savedProfile = await findProfile(env, identity.uid)
