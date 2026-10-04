@@ -59,7 +59,6 @@ import {
   adminStatusPresentation,
   getAdminStatusLabel,
 } from '../features/admin-portal/booking-status'
-import CustomerWhatsApp from '../features/admin-portal/CustomerWhatsApp'
 import {
   formatAdminCalendarDate,
   formatAdminCurrency,
@@ -279,8 +278,6 @@ function getSnapshotExtraDescription(extra: BookingSnapshotExtra): string {
       return `${extra.name} — ${extra.quantity} نسخة، ${extra.pageCount} صفحة لكل نسخة`
     case 'wooden_enlargement':
       return `${extra.name} (${extra.dimensions}) — الكمية ${extra.quantity}`
-    case 'coverage_addon':
-      return `${extra.name} — إضافة على التغطية`
   }
 }
 
@@ -684,11 +681,6 @@ function BookingDetails({
               </div>
             </dl>
           </section>
-
-          <CustomerWhatsApp
-            booking={booking}
-            eventDateLabel={formatAdminCalendarDate(booking.eventDate)}
-          />
 
           <section
             className="admin-detail__section"

@@ -1,5 +1,6 @@
 import { isValidDateKey, parseInstant } from '../../shared/timing.js'
 import { renderHoldExpiredEmail } from '../emails/hold.js'
+import { readHoldAutoExpiry } from '../settings/features.js'
 import {
   outboxInsertStatement,
   prepareOutboxRow,
@@ -14,28 +15,38 @@ import {
 } from './job-types.js'
 import {
   LATEST_RECEIPT_STATUS_SQL,
-  OWED_HOLD_PREDICATE_SQL,
+  NOTICE_PROTECTED_COLUMN_SQL,
+  SYSTEM_EXPIRABLE_HOLD_SQL,
   readOwedHold,
   type OwedHold,
 } from './hold-state.js'
 
 /**
  * The `hold-expiry` job (ADR-001 §2.2, every 15 minutes, before the
- * reminders and the outbox drain).
+ * reminders and the outbox drain; plan 11 B1, H3, TM-15, N-50, N-52).
+ *
+ * It runs only while automatic expiry is on: AX = EM ∧ OCe (an email
+ * provider is configured, ONLINE_CONFIRMATION is on and the D1 kill switch
+ * is on; worker/settings/features.ts). Otherwise it expires nothing, and
+ * overdue holds stay `approved_hold` for the admin queue's `decide_now`
+ * section: without email she was never reminded, and with the switch pulled
+ * she cannot finish online.
  *
  * It selects by STATE, not by time window, so a missed tick simply catches
  * up: every flow-2 booking whose customer still owes a receipt (see
- * hold-state.ts) and whose `hold_expires_at` <= now, oldest deadline first,
- * at most 50 per tick. Each booking then expires in ONE D1 batch (one
- * transaction):
- * 1. the guarded UPDATE to `expired`, re-checking the state it was selected
- *    in (status, deadline, flow 2, receipt still owed);
+ * hold-state.ts), that is not notice-protected, and whose `hold_expires_at`
+ * <= now, oldest deadline first, at most 50 per tick. Each booking then
+ * expires in ONE D1 batch (one transaction):
+ * 1. the guarded UPDATE to `expired`, re-checking inside the statement the
+ *    state it was selected in (status, deadline, flow 2, receipt still owed)
+ *    and, again, that no notice for this deadline exists and that the kill
+ *    switch is still on (TM-15);
  * 2. the status-history row, `changed_by` NULL (the system), whose
  *    `CASE WHEN changes() = 1` guard rolls the whole batch back when the
- *    booking changed after it was selected (a receipt uploaded, an extension,
- *    a cancel);
- * 3. a `booking_events` row with actor `system` — written only once the
- *    `hold_expired` event kind is seeded (migration 0005 does not seed it);
+ *    booking changed after it was selected (a receipt uploaded, a notice,
+ *    an extension, a cancel, the switch pulled);
+ * 3. a `booking_events` row with actor `system` (`hold_expired`, seeded by
+ *    migration 0006; the SELECT keeps it a no-op on an older database);
  * 4. its pending hold reminders superseded;
  * 5. the `hold_expired` email queued in the outbox, keyed on the deadline.
  *
@@ -48,10 +59,12 @@ export const HOLD_EXPIRY_LIMITS = {
 } as const
 
 export interface HoldExpirySummary {
+  /** AX was on for this pass; when false nothing was selected or written. */
+  readonly autoExpiryOn: boolean
   readonly selected: number
   readonly expired: number
-  /** Expired without an email: no usable address, erased data, or an unusable deadline. */
-  readonly expiredWithoutEmail: number
+  /** Expired without a notice to her: no usable address, erased data, or an unusable deadline. */
+  readonly expiredUnnotified: number
   /** Changed between the select and the batch; nothing written. */
   readonly raced: number
   readonly failed: number
@@ -67,12 +80,13 @@ export interface HoldExpiryOptions {
   /**
    * Only holds for this Riyadh date (`YYYY-MM-DD`): the targeted sweep the
    * approve path runs first, so a hold that has just expired never causes a
-   * false DATE_UNAVAILABLE (ADR §2.1). Omitted by the cron job.
+   * false DATE_UNAVAILABLE (ADR §2.1). Omitted by the cron job. The same
+   * AX and notice rules apply.
    */
   readonly eventDate?: string
 }
 
-type ExpireOutcome = 'expired' | 'expired_without_email' | 'raced' | 'failed'
+type ExpireOutcome = 'expired' | 'expired_unnotified' | 'raced' | 'failed'
 
 // ?1 now | ?2 max rows | ?3 event_date filter, or NULL for every date
 const SELECT_DUE_SQL = `
@@ -82,12 +96,14 @@ const SELECT_DUE_SQL = `
     b.status,
     b.event_date,
     b.hold_expires_at,
+    b.terms_accepted_at,
     ${LATEST_RECEIPT_STATUS_SQL} AS latest_receipt_status,
+    ${NOTICE_PROTECTED_COLUMN_SQL} AS notice_protected,
     CASE WHEN u.erased_at IS NULL AND u.email_verified_at IS NOT NULL THEN u.email END AS customer_email,
     CASE WHEN u.erased_at IS NULL THEN u.first_name END AS customer_first_name
   FROM booking_requests AS b
   LEFT JOIN users AS u ON u.id = b.user_id
-  WHERE ${OWED_HOLD_PREDICATE_SQL}
+  WHERE ${SYSTEM_EXPIRABLE_HOLD_SQL}
     AND b.hold_expires_at <= ?1
     AND (?3 IS NULL OR b.event_date = ?3)
   ORDER BY b.hold_expires_at, b.id
@@ -103,7 +119,7 @@ const EXPIRE_SQL = `
     AND b.status = ?2
     AND b.hold_expires_at = ?3
     AND b.hold_expires_at <= ?4
-    AND ${OWED_HOLD_PREDICATE_SQL}
+    AND ${SYSTEM_EXPIRABLE_HOLD_SQL}
 `
 
 // The guard: to_status is NULL when the UPDATE changed nothing, which fails
@@ -121,7 +137,7 @@ const HISTORY_SQL = `
 `
 
 // Selecting the kind from event_kinds keeps this a no-op (never a foreign-key
-// failure) until a migration seeds 'hold_expired'.
+// failure) on a database older than migration 0006, which seeds 'hold_expired'.
 const SYSTEM_EVENT_SQL = `
   INSERT INTO booking_events (booking_id, actor, event, details, created_at)
   SELECT ?1, 'system', k.kind, json_object('fromStatus', ?2, 'holdExpiresAt', ?3), ?4
@@ -149,7 +165,7 @@ const RECHECK_SQL = `
     AND b.status = ?2
     AND b.hold_expires_at = ?3
     AND b.hold_expires_at <= ?4
-    AND ${OWED_HOLD_PREDICATE_SQL}
+    AND ${SYSTEM_EXPIRABLE_HOLD_SQL}
 `
 
 /**
@@ -162,8 +178,9 @@ export function isHoldExpiryDue(hold: OwedHold, now: Date): boolean {
 
 /**
  * The selected rows that may expire now: flow-2 holds that still owe a
- * receipt and whose deadline has passed, in deadline order, at most `limit`.
- * Anything else (a legacy row, a pending receipt, a future deadline, a
+ * receipt, are not notice-protected, and whose deadline has passed, in
+ * deadline order, at most `limit`. Anything else (a legacy row, a pending
+ * receipt, a notice for the current deadline, a future deadline, a
  * malformed row) is dropped.
  */
 export function selectExpirableHolds(
@@ -173,7 +190,10 @@ export function selectExpirableHolds(
 ): OwedHold[] {
   return rows
     .map(readOwedHold)
-    .filter((hold): hold is OwedHold => hold !== null && isHoldExpiryDue(hold, now))
+    .filter(
+      (hold): hold is OwedHold =>
+        hold !== null && !hold.noticeProtected && isHoldExpiryDue(hold, now),
+    )
     .sort(
       (left, right) =>
         left.holdExpiresAtMs - right.holdExpiresAtMs ||
@@ -269,13 +289,14 @@ async function expireHold(
     return (await isStillDue(env, hold, nowIso)) ? 'failed' : 'raced'
   }
 
-  return email.ok ? 'expired' : 'expired_without_email'
+  return email.ok ? 'expired' : 'expired_unnotified'
 }
 
 /**
  * One bounded expiry pass: the cron job's, or (with `eventDate`) the approve
- * path's targeted sweep. Throws JobFailure for an unusable clock or date and
- * lets a D1 error on the initial select (or on a re-read) propagate.
+ * path's targeted sweep. Does nothing while AX is off (N-52). Throws
+ * JobFailure for an unusable clock or date and lets a D1 error on the
+ * switch read, the initial select (or a re-read) propagate.
  */
 export async function expireOverdueHolds(
   env: Env,
@@ -291,6 +312,18 @@ export async function expireOverdueHolds(
     throw new JobFailure('HOLD_EXPIRY_INVALID_DATE')
   }
 
+  if (!(await readHoldAutoExpiry(env, env.DB))) {
+    return {
+      autoExpiryOn: false,
+      selected: 0,
+      expired: 0,
+      expiredUnnotified: 0,
+      raced: 0,
+      failed: 0,
+      halted: false,
+    }
+  }
+
   const limit = Math.max(
     0,
     Math.min(
@@ -304,7 +337,7 @@ export async function expireOverdueHolds(
   const holds = selectExpirableHolds(selectedRows.results, now, limit)
 
   let expired = 0
-  let expiredWithoutEmail = 0
+  let expiredUnnotified = 0
   let raced = 0
   let failed = 0
   let halted = false
@@ -321,8 +354,8 @@ export async function expireOverdueHolds(
       case 'expired':
         expired += 1
         break
-      case 'expired_without_email':
-        expiredWithoutEmail += 1
+      case 'expired_unnotified':
+        expiredUnnotified += 1
         break
       case 'raced':
         raced += 1
@@ -334,9 +367,10 @@ export async function expireOverdueHolds(
   }
 
   return {
+    autoExpiryOn: true,
     selected: holds.length,
     expired,
-    expiredWithoutEmail,
+    expiredUnnotified,
     raced,
     failed,
     halted,
@@ -350,10 +384,14 @@ async function runHoldExpiryJob(context: JobContext): Promise<void> {
     appBaseUrl: context.env.APP_BASE_URL,
   })
 
-  if (summary.expired + summary.expiredWithoutEmail > 0) {
-    console.log(
-      `HOLD_EXPIRY_DONE expired=${summary.expired + summary.expiredWithoutEmail} without_email=${summary.expiredWithoutEmail}`,
-    )
+  const expiredCount = summary.expired + summary.expiredUnnotified
+
+  if (expiredCount > 0) {
+    console.log(`HOLD_EXPIRY_DONE count=${expiredCount}`)
+  }
+
+  if (summary.expiredUnnotified > 0) {
+    console.warn(`HOLD_EXPIRY_UNNOTIFIED count=${summary.expiredUnnotified}`)
   }
 
   if (summary.halted) {

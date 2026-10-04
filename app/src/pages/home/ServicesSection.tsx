@@ -5,7 +5,6 @@ import {
   type NavigationHandler,
 } from '../../layout/navigation'
 import { AlbumIcon, CameraIcon, ChecklistIcon } from './icons'
-import DisplayHeading from '../../components/DisplayHeading'
 
 interface ServicesSectionProps {
   onNavigate: NavigationHandler
@@ -50,7 +49,7 @@ export default function ServicesSection({ onNavigate }: ServicesSectionProps) {
       <div className="container">
         <header className="section-heading reveal">
           <p className="eyebrow">خدمات التصوير</p>
-          <DisplayHeading id="home-services-title" text="تجربة مصممة لتفاصيل يومكِ" ornament />
+          <h2 id="home-services-title">تجربة مصممة لتفاصيل يومكِ</h2>
         </header>
 
         <ul className="home-services__grid" role="list">

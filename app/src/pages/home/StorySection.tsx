@@ -1,4 +1,3 @@
-import DisplayHeading from '../../components/DisplayHeading'
 /**
  * Her story (08-copy-ar §1.2) — the ONLY first-person («أنا») text on the
  * site (§0.1). Built on verified facts only: Madinah, licensed by the Ministry
@@ -12,7 +11,9 @@ export default function StorySection() {
         <p className="eyebrow home-story__label reveal">سندس يار</p>
 
         <div className="home-story__content reveal">
-          <DisplayHeading id="home-story-title" className="home-story__title" text="أنا سندس" />
+          <h2 id="home-story-title" className="home-story__title">
+            أنا سندس
+          </h2>
           <p>
             أوثّق يوم العروس بعين هادئة تهتم بالتفاصيل الصغيرة كما تهتم
             باللحظات الكبيرة — يد الحناء، والنظرة الأخيرة في المرآة، ولحظة

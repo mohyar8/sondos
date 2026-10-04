@@ -1,5 +1,4 @@
 import { LockIcon, ShieldCheckIcon } from './icons'
-import DisplayHeading from '../../components/DisplayHeading'
 
 /**
  * Trust & consent (08-copy-ar §1.6). Only the licence statement and the
@@ -13,7 +12,9 @@ export default function TrustSection() {
       <div className="home-trust__layout container">
         <header className="section-heading home-trust__heading reveal">
           <p className="eyebrow">خصوصيتكِ أولًا</p>
-          <DisplayHeading id="home-trust-title" text="صوركِ ملككِ، ونصونها على هذا الأساس" ornament />
+          <h2 id="home-trust-title">
+            صوركِ ملككِ، ونصونها على هذا الأساس
+          </h2>
           <p>
             سندس يار مصورة مصرّحة من وزارة العمل، وتلتزم بألا تُنشر أي صورة —
             في الموقع أو في حسابات التواصل — إلا بموافقة العروس.

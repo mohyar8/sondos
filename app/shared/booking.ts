@@ -2,7 +2,6 @@ import {
   albumBoxOptions,
   albumSizes,
   calculateMagazineUnitPrice,
-  coverageAddonOptions,
   coverageOptions,
   getValidAlbumPageCounts,
   magazinePricing,
@@ -12,7 +11,6 @@ import {
   type AlbumBoxId,
   type AlbumPageCount,
   type AlbumSizeId,
-  type CoverageAddonId,
   type CoverageId,
   type MagazinePageCount,
   type PhotoCount,
@@ -32,18 +30,9 @@ export interface BookingSelectionInput {
   magazineQuantity: number
   magazinePageCount: MagazinePageCount
   woodenEnlargementQuantity: number
-  /** Optional add-ons (absent = false) so older clients stay valid. */
-  mobileCoverage?: boolean
-  secondCamera?: boolean
 }
 
-export type NormalizedBookingSelection = Omit<
-  BookingSelectionInput,
-  'mobileCoverage' | 'secondCamera'
-> & {
-  mobileCoverage: boolean
-  secondCamera: boolean
-}
+export type NormalizedBookingSelection = BookingSelectionInput
 
 export interface SnapshotPackage {
   id: CoverageId
@@ -116,20 +105,10 @@ export interface SnapshotWoodenEnlargementExtra {
   subtotal: number
 }
 
-export interface SnapshotCoverageAddonExtra {
-  kind: 'coverage_addon'
-  id: CoverageAddonId
-  name: string
-  quantity: 1
-  unitPrice: number
-  subtotal: number
-}
-
 export type BookingSnapshotExtra =
   | SnapshotIndividualPrintExtra
   | SnapshotMagazineExtra
   | SnapshotWoodenEnlargementExtra
-  | SnapshotCoverageAddonExtra
 
 export interface BookingCalculationBreakdown {
   coverage: number
@@ -138,8 +117,6 @@ export interface BookingCalculationBreakdown {
   individualPrints: number
   magazines: number
   woodenEnlargements: number
-  /** Absent on snapshots stored before the add-ons existed (= 0). */
-  coverageAddons?: number
 }
 
 export interface BookingPackageSnapshot {
@@ -191,18 +168,9 @@ const selectionKeys = new Set([
   'woodenEnlargementQuantity',
 ])
 
-const optionalSelectionKeys = new Set(['mobileCoverage', 'secondCamera'])
-const allSelectionKeys: ReadonlySet<string> = new Set([
-  ...selectionKeys,
-  ...optionalSelectionKeys,
-])
-const coverageAddonIds: ReadonlySet<string> = new Set(
-  coverageAddonOptions.map((option) => option.id),
-)
-
 const printQuantityKeys: ReadonlySet<string> = new Set(['a6', 'a5', 'a4'])
 const MAXIMUM_SNAPSHOT_TEXT_LENGTH = 160
-const MAXIMUM_EXTRAS = 7
+const MAXIMUM_EXTRAS = 5
 
 /**
  * Most units of one item a single booking request may order (audit SEC-09).
@@ -456,21 +424,6 @@ function isSnapshotWoodenEnlargementExtra(
   )
 }
 
-function isSnapshotCoverageAddonExtra(
-  value: Record<string, unknown>,
-): value is Record<string, unknown> & SnapshotCoverageAddonExtra {
-  return (
-    value.kind === 'coverage_addon' &&
-    typeof value.id === 'string' &&
-    coverageAddonIds.has(value.id) &&
-    isSnapshotText(value.name) &&
-    value.quantity === 1 &&
-    isSnapshotAmount(value.unitPrice) &&
-    isSnapshotAmount(value.subtotal) &&
-    value.unitPrice === value.subtotal
-  )
-}
-
 function isSnapshotExtra(value: unknown): value is BookingSnapshotExtra {
   if (!isRecord(value)) {
     return false
@@ -479,8 +432,7 @@ function isSnapshotExtra(value: unknown): value is BookingSnapshotExtra {
   return (
     isSnapshotIndividualPrintExtra(value) ||
     isSnapshotMagazineExtra(value) ||
-    isSnapshotWoodenEnlargementExtra(value) ||
-    isSnapshotCoverageAddonExtra(value)
+    isSnapshotWoodenEnlargementExtra(value)
   )
 }
 
@@ -494,9 +446,7 @@ function isCalculationBreakdown(
     isSnapshotAmount(value.albumBoxUpgrade) &&
     isSnapshotAmount(value.individualPrints) &&
     isSnapshotAmount(value.magazines) &&
-    isSnapshotAmount(value.woodenEnlargements) &&
-    (value.coverageAddons === undefined ||
-      isSnapshotAmount(value.coverageAddons))
+    isSnapshotAmount(value.woodenEnlargements)
   )
 }
 
@@ -525,8 +475,7 @@ export function isBookingPackageSnapshot(
     value.calculation.albumBoxUpgrade +
     value.calculation.individualPrints +
     value.calculation.magazines +
-    value.calculation.woodenEnlargements +
-    (value.calculation.coverageAddons ?? 0)
+    value.calculation.woodenEnlargements
 
   return (
     Number.isSafeInteger(calculatedTotal) &&
@@ -544,10 +493,7 @@ export function validateBookingSelection(
     )
   }
 
-  if (
-    !hasOnlyKeys(value, allSelectionKeys) ||
-    !hasEveryKey(value, selectionKeys)
-  ) {
+  if (!hasExactKeys(value, selectionKeys)) {
     return validationFailure(
       'UNKNOWN_PROPERTY',
       'تحتوي اختيارات الحجز على حقول غير مسموحة أو ناقصة.',
@@ -561,11 +507,7 @@ export function validateBookingSelection(
     !isPhotoCount(value.photoCount) ||
     !isAlbumPageCount(value.albumPageCount) ||
     !isAlbumBoxId(value.albumBoxId) ||
-    !isMagazinePageCount(value.magazinePageCount) ||
-    (value.mobileCoverage !== undefined &&
-      typeof value.mobileCoverage !== 'boolean') ||
-    (value.secondCamera !== undefined &&
-      typeof value.secondCamera !== 'boolean')
+    !isMagazinePageCount(value.magazinePageCount)
   ) {
     return validationFailure(
       'UNSUPPORTED_OPTION',
@@ -651,20 +593,9 @@ export function validateBookingSelection(
     magazineQuantity: value.magazineQuantity,
     magazinePageCount: value.magazinePageCount,
     woodenEnlargementQuantity: value.woodenEnlargementQuantity,
-    mobileCoverage: value.mobileCoverage === true,
-    secondCamera: value.secondCamera === true,
   }
 
   const coveragePrice = coverage.price
-  const selectedAddons = coverageAddonOptions.filter((option) =>
-    option.id === 'mobile-bts'
-      ? selection.mobileCoverage
-      : selection.secondCamera,
-  )
-  const coverageAddonsSubtotal = selectedAddons.reduce(
-    (subtotal, option) => subtotal + option.price,
-    0,
-  )
   const albumPrice = selection.albumEnabled
     ? albumSize.pagePrices[selection.albumPageCount]
     : 0
@@ -694,7 +625,6 @@ export function validateBookingSelection(
     magazineUnitPrice,
     magazineSubtotal,
     woodenEnlargementSubtotal,
-    coverageAddonsSubtotal,
   ]
 
   if (!areSafeAmounts(calculatedAmounts)) {
@@ -710,8 +640,7 @@ export function validateBookingSelection(
     albumBoxPrice +
     individualPrintsSubtotal +
     magazineSubtotal +
-    woodenEnlargementSubtotal +
-    coverageAddonsSubtotal
+    woodenEnlargementSubtotal
 
   if (!Number.isSafeInteger(estimatedTotal)) {
     return validationFailure(
@@ -720,14 +649,7 @@ export function validateBookingSelection(
     )
   }
 
-  const extras: BookingSnapshotExtra[] = selectedAddons.map((option) => ({
-    kind: 'coverage_addon',
-    id: option.id,
-    name: option.label,
-    quantity: 1,
-    unitPrice: option.price,
-    subtotal: option.price,
-  }))
+  const extras: BookingSnapshotExtra[] = []
 
   for (const option of printSizeOptions) {
     const quantity = selection.printQuantities[option.id]
@@ -823,7 +745,6 @@ export function validateBookingSelection(
       individualPrints: individualPrintsSubtotal,
       magazines: magazineSubtotal,
       woodenEnlargements: woodenEnlargementSubtotal,
-      coverageAddons: coverageAddonsSubtotal,
     },
     estimatedTotal,
   }

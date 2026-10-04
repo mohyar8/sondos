@@ -18,10 +18,10 @@
 // - jsonResponse carries Strict-Transport-Security (SEC-12) with nosniff and
 //   no-store, and no caller header overrides them;
 // - the plan's codes (R-05): 429 RATE_LIMITED from the RL_BOOKING /
-//   RL_PROFILE bindings (worker/rate-limit.ts). Two booking codes keep their
-//   Wave 0 names because the shipped booking form (src/api/bookings.ts)
-//   accepts no other: 409 TOO_MANY_OPEN_REQUESTS (OPEN_REQUEST_LIMIT once
-//   W2-16 updates that client) and 400 BOOKING_TOO_FAR_AHEAD
+//   RL_PROFILE bindings (worker/rate-limit.ts) and 409 OPEN_REQUEST_LIMIT
+//   for the open-request cap (W2-16; Wave 0 named it TOO_MANY_OPEN_REQUESTS).
+//   One booking code keeps its Wave 0 name because the shipped booking form
+//   (src/api/bookings.ts) accepts no other: 400 BOOKING_TOO_FAR_AHEAD
 //   (DATE_BEYOND_HORIZON with W3-15). The cap's 409 is fed through that
 //   client to prove the form still names the cap.
 //
@@ -64,10 +64,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const HSTS = 'max-age=63072000; includeSubDomains'
 const PAYLOAD_TOO_LARGE_MESSAGE = 'حجم البيانات المرسلة أكبر من المسموح.'
 const RATE_LIMITED_MESSAGE = 'طلبات كثيرة خلال وقت قصير. حاولي مرة أخرى بعد قليل.'
-/** Wave 0's wording, byte for byte (the Worker's message for the cap). */
-const TOO_MANY_OPEN_REQUESTS_MESSAGE =
-  'لديكِ 3 طلبات حجز مفتوحة، وهو الحد الأقصى. انتظري مراجعتها أو تواصلي معنا عبر واتساب قبل إرسال طلب جديد.'
-/** What the booking form shows for the cap (src/lib/server-error-messages.ts). */
+/**
+ * The cap's wording, byte for byte: the Worker's 409 OPEN_REQUEST_LIMIT
+ * (worker/rate-limit.ts) and what the booking form shows for it
+ * (src/lib/server-error-messages.ts) are the same sentence.
+ */
 const OPEN_REQUEST_LIMIT_MESSAGE =
   'لديكِ ثلاثة طلبات مفتوحة. انتظري الرد عليها قبل إرسال طلب جديد.'
 const BOOKING_TOO_FAR_AHEAD_MESSAGE =
@@ -878,14 +879,14 @@ describe('POST /api/bookings: bounded body (SEC-05) and the plan\'s codes (R-05)
     )
   }
 
-  test(`the normal request still works; request ${OPEN_BOOKING_REQUESTS_MAX + 1} open → Wave 0's 409 TOO_MANY_OPEN_REQUESTS`, async () => {
+  test(`the normal request still works; request ${OPEN_BOOKING_REQUESTS_MAX + 1} open → the plan's 409 OPEN_REQUEST_LIMIT`, async () => {
     const { database, env } = freshEnv()
     const token = await mintToken(customer)
     const response = await requestPastOpenCap(env, token)
     const error = await readError(response)
 
-    assertFixedError(error, 409, 'TOO_MANY_OPEN_REQUESTS')
-    assert.equal(error.body.error.message, TOO_MANY_OPEN_REQUESTS_MESSAGE)
+    assertFixedError(error, 409, 'OPEN_REQUEST_LIMIT')
+    assert.equal(error.body.error.message, OPEN_REQUEST_LIMIT_MESSAGE)
     assertApiHeaders(response)
     assert.equal(countRows(database, 'booking_requests'), OPEN_BOOKING_REQUESTS_MAX)
   })
