@@ -1,0 +1,179 @@
+{
+  "pages": [
+    {
+      "label": "home-desktop-1440",
+      "url": "http://localhost:5173/",
+      "width": 1440,
+      "title": "المصورة سندس يار",
+      "h1": "يومكِ لكِ وحدكِ، وصوركِ لا تُنشر إلا بإذنكِ",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 6539,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\home-desktop-1440.jpg"
+    },
+    {
+      "label": "portfolio-desktop-1440",
+      "url": "http://localhost:5173/portfolio",
+      "width": 1440,
+      "title": "أعمالنا | المصورة سندس يار",
+      "h1": "من أعمالنا",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 4331,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\portfolio-desktop-1440.jpg"
+    },
+    {
+      "label": "packages-desktop-1440",
+      "url": "http://localhost:5173/packages",
+      "width": 1440,
+      "title": "الباقات والأسعار | المصورة سندس يار",
+      "h1": "اختاري باقتكِ وتفاصيل يومكِ",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 4088,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\packages-desktop-1440.jpg"
+    },
+    {
+      "label": "my-bookings-desktop-1440",
+      "url": "http://localhost:5173/my-bookings",
+      "width": 1440,
+      "title": "حجوزاتي | المصورة سندس يار",
+      "h1": "حجوزاتي",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": "noindex, nofollow",
+      "height": 1385,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\my-bookings-desktop-1440.jpg"
+    },
+    {
+      "label": "admin-desktop-1440",
+      "url": "http://localhost:5173/admin",
+      "width": 1440,
+      "title": "لوحة الإدارة | المصورة سندس يار",
+      "h1": "إدارة الحجوزات",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": "noindex, nofollow",
+      "height": 900,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\admin-desktop-1440.jpg"
+    },
+    {
+      "label": "home-mobile-375",
+      "url": "http://localhost:5173/",
+      "width": 375,
+      "title": "المصورة سندس يار",
+      "h1": "يومكِ لكِ وحدكِ، وصوركِ لا تُنشر إلا بإذنكِ",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 7483,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\home-mobile-375.jpg"
+    },
+    {
+      "label": "portfolio-mobile-375",
+      "url": "http://localhost:5173/portfolio",
+      "width": 375,
+      "title": "أعمالنا | المصورة سندس يار",
+      "h1": "من أعمالنا",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 12417,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\portfolio-mobile-375.jpg"
+    },
+    {
+      "label": "packages-mobile-375",
+      "url": "http://localhost:5173/packages",
+      "width": 375,
+      "title": "الباقات والأسعار | المصورة سندس يار",
+      "h1": "اختاري باقتكِ وتفاصيل يومكِ",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 5286,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\packages-mobile-375.jpg"
+    },
+    {
+      "label": "my-bookings-mobile-375",
+      "url": "http://localhost:5173/my-bookings",
+      "width": 375,
+      "title": "حجوزاتي | المصورة سندس يار",
+      "h1": "حجوزاتي",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": "noindex, nofollow",
+      "height": 1757,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\my-bookings-mobile-375.jpg"
+    },
+    {
+      "label": "admin-mobile-375",
+      "url": "http://localhost:5173/admin",
+      "width": 375,
+      "title": "لوحة الإدارة | المصورة سندس يار",
+      "h1": "إدارة الحجوزات",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": "noindex, nofollow",
+      "height": 812,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\admin-mobile-375.jpg"
+    }
+  ],
+  "lightbox": {
+    "tileFound": true,
+    "afterOpen": {
+      "open": true,
+      "label": "_r_2_",
+      "text": "عرض الصور بحجم أكبر\nإغلاق\nالصورة السابقة\nالصورة التالية\n\n1 من 32\n\nلقطة لباقة من زهور الكالا البيضاء والتوليب الوردي على بشت أسود مطرّز بالذهبي، من أعمال المصورة",
+      "focusInside": true
+    },
+    "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\lightbox-desktop-1440.jpg",
+    "afterArrows": "عرض الصور بحجم أكبر\nإغلاق\nالصورة السابقة\nالصورة التالية\n\n3 من 32\n\nلقطة ليد العريس تمتد نحو يد العروس بكمّها الأحمر المطر",
+    "fileAfterArrows": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\lightbox-after-arrows.jpg",
+    "afterEscape": {
+      "dialogOpen": false,
+      "focusIsTile": true,
+      "focused": ""
+    },
+    "filter": {
+      "chips": [
+        "الكل",
+        "التفاصيل",
+        "الأيادي والخواتم",
+        "العروسان",
+        "لحظات من اليوم"
+      ],
+      "before": 32,
+      "after": 10
+    },
+    "consoleErrors": []
+  },
+  "menu": {
+    "opened": "true",
+    "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run2\\menu-open-mobile-375.jpg",
+    "afterEscape": "false",
+    "focusOnToggle": true
+  }
+}

@@ -1,0 +1,569 @@
+{
+  "_about": "Orchestrator-verified catalogue of the owner's 32 site photos (visually reviewed 2026-09-24 from numbered contact sheets + enlarged crops of #18/#23/#26). Order = 03-design-system.md §5.1 portfolio order. Alt text follows 08-copy-ar.md §2.1 (describe only what is visible). Privacy: no photo shows an identifiable bride face; where a bride appears, her face is already pixelated by the owner (her own public practice). Men's faces may appear (the owner publishes them on Instagram).",
+  "source_root": "C:/Users/azooz/Desktop/sundus-yar/assets-incoming/site-photos-7239",
+  "slots": {
+    "hero": "bouquet-bisht",
+    "homeFeatured": [
+      "hands-reaching",
+      "rings-satin",
+      "gown-floral-arch"
+    ],
+    "packagesBanner": "bouquet-white-lace",
+    "_packagesBanner_note": "Deviation from 03 §5.1 (which proposed #2 bride-entrance): #2's pixelated face looks rough at banner scale; #20 is an unpixelated 3:2 detail frame."
+  },
+  "photos": [
+    {
+      "n": 1,
+      "file": "4.5/IMG_2845 (1) copy.webp",
+      "ratio": "4:5",
+      "slug": "bouquet-bisht",
+      "alt": "لقطة لباقة من زهور الكالا البيضاء والتوليب الوردي على بشت أسود مطرّز بالذهبي، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "details"
+    },
+    {
+      "n": 2,
+      "file": "3.2/2M4A1670 copy.jpg copy.avif",
+      "ratio": "3:2",
+      "slug": "bride-entrance",
+      "alt": "لقطة للعروس بفستانها الأبيض وطرحتها الطويلة تتقدّم نحو الحضور بالبشوت، مع طمس وجهها حفاظًا على الخصوصية، من أعمال المصورة سندس يار",
+      "privacy": "bride face pixelated by owner — grid only, not featured",
+      "category": "moments"
+    },
+    {
+      "n": 3,
+      "file": "16-9/2M4A0708 ابيض copy.avif",
+      "ratio": "16:9",
+      "slug": "hands-reaching",
+      "alt": "لقطة ليد العريس تمتد نحو يد العروس بكمّها الأحمر المطرّز بالذهبي وسوار اللؤلؤ، من أعمال المصورة سندس يار",
+      "privacy": "no faces; carries the studio's small watermark",
+      "category": "hands"
+    },
+    {
+      "n": 4,
+      "file": "4.5/2M4A8403 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "hands-rings-bouquet",
+      "alt": "لقطة ليد العريس تحتضن يد العروس مع خاتم الزواج وباقة الورد، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 5,
+      "file": "3.2/2M4A4068 copy.jpg copy.avif",
+      "ratio": "3:2",
+      "slug": "rings-satin",
+      "alt": "لقطة لخاتم الخطوبة ودبلتي الزواج على وسادة من الساتان الأبيض، من أعمال المصورة سندس يار",
+      "privacy": "no people",
+      "category": "details"
+    },
+    {
+      "n": 6,
+      "file": "4.5/2M4A1262 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "gown-floral-arch",
+      "alt": "لقطة لفستان عروس عاجي مطرّز بالذهبي معروض تحت قوس مزيّن بالستائر والزهور، من أعمال المصورة سندس يار",
+      "privacy": "no people",
+      "category": "details"
+    },
+    {
+      "n": 7,
+      "file": "16-9/2M4A0881 copy 2.avif",
+      "ratio": "16:9",
+      "slug": "phones-lockscreens",
+      "alt": "لقطة ليدي العروسين تحملان هاتفين تظهر على شاشتيهما صورهما، بجانب باقة ورد وردية، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "details"
+    },
+    {
+      "n": 8,
+      "file": "3.2/2M4A0331 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "hands-lace-sleeve",
+      "alt": "لقطة ليد العروس بكمّها الدانتيل تمسك يد العريس مع الخواتم، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 9,
+      "file": "4.5/IMG_2989.JPG copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-shoes",
+      "alt": "لقطة للعروس تحمل حذاءها العاجي المزيّن باللؤلؤ، من أعمال المصورة سندس يار",
+      "privacy": "cropped below the face",
+      "category": "details"
+    },
+    {
+      "n": 10,
+      "file": "3.2/2M4A0691 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "hands-ring-red-sleeve",
+      "alt": "لقطة ليد العريس بخاتمه تمسك يد العروس بكمّها الأحمر المطرّز، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 11,
+      "file": "4.5/2M4A1589 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "bride-with-bishts",
+      "alt": "لقطة للعروس خلف رجلين يرتديان البشت الأسود المطرّز بالذهبي، مع طمس وجهها حفاظًا على الخصوصية، من أعمال المصورة سندس يار",
+      "privacy": "bride face pixelated by owner — grid only",
+      "category": "moments"
+    },
+    {
+      "n": 12,
+      "file": "16-9/2M4A2256 copy 2.avif",
+      "ratio": "16:9",
+      "slug": "hands-watch",
+      "alt": "لقطة ليد العروس بساعتها وخاتمها فوق يد العريس، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 13,
+      "file": "3.2/2M4A8490 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "rings-exchange",
+      "alt": "لقطة ليدي العروسين تمسكان دبلتي الزواج قبل تبادلهما، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 14,
+      "file": "4.5/2M4A1955 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "ring-soft-focus",
+      "alt": "لقطة ناعمة التركيز لخاتم الخطوبة في يد العروس، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 15,
+      "file": "3.2/2M4A0822 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "hands-fuchsia-dress",
+      "alt": "لقطة ليدي العروسين بالخواتم على فستان فوشيا مطرّز بالذهبي واللؤلؤ، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 16,
+      "file": "4.5/2M4A0379 ستوري copy.jpg copy.avif",
+      "ratio": "4:5",
+      "slug": "couple-banquet-hall",
+      "alt": "لقطة للعروسين من الخلف داخل قاعة الحفل، من أعمال المصورة سندس يار",
+      "privacy": "seen from behind",
+      "category": "couple"
+    },
+    {
+      "n": 17,
+      "file": "3.2/2M4A0931 copy.jpg copy.avif",
+      "ratio": "3:2",
+      "slug": "embrace-pink-bouquet",
+      "alt": "لقطة ليدي العريس حول خصر العروس مع باقة ورد وردية، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "couple"
+    },
+    {
+      "n": 18,
+      "file": "4.5/2M4A2024 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "paper-rose-portrait",
+      "alt": "لقطة للعروس تمسك وردة كبيرة بلون الخوخ، مع طمس وجهها حفاظًا على الخصوصية، من أعمال المصورة سندس يار",
+      "privacy": "bride face heavily pixelated by owner — grid only, never featured",
+      "category": "moments"
+    },
+    {
+      "n": 19,
+      "file": "16-9/2M4A6038 copy.avif",
+      "ratio": "16:9",
+      "slug": "ring-black-box",
+      "alt": "لقطة لخاتم ذهبي مرصّع على علبة سوداء، من أعمال المصورة سندس يار",
+      "privacy": "no people",
+      "category": "details"
+    },
+    {
+      "n": 20,
+      "file": "3.2/IMG_2143.JPG copy.avif",
+      "ratio": "3:2",
+      "slug": "bouquet-white-lace",
+      "alt": "لقطة ليدي العروس بكمّها الدانتيل تمسكان باقة من الزهور البيضاء الصغيرة، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "details"
+    },
+    {
+      "n": 21,
+      "file": "4.5/2M4A2258 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "hand-on-bisht",
+      "alt": "لقطة ليد العروس بساعتها وخاتمها على ذراع العريس بالبشت المطرّز بالذهبي، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 22,
+      "file": "3.2/2M4A1034 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "clasped-hands",
+      "alt": "لقطة ليدي العروسين متشابكتين مع خاتم الخطوبة، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 23,
+      "file": "4.5/IMG_3275.JPG copy.avif",
+      "ratio": "4:5",
+      "slug": "couple-veil-stage",
+      "alt": "لقطة للعروسين على المنصة وطرحة العروس تتطاير، مع طمس الوجوه حفاظًا على الخصوصية، من أعمال المصورة سندس يار",
+      "privacy": "both faces pixelated by owner (verified on an enlarged crop) — grid only",
+      "category": "couple"
+    },
+    {
+      "n": 24,
+      "file": "3.2/2M4A1416 copy.jpg copy.avif",
+      "ratio": "3:2",
+      "slug": "paper-rose-gown",
+      "alt": "لقطة ليدي العروس تمسك وردة كبيرة بلون الخوخ على فستانها المطرّز، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "details"
+    },
+    {
+      "n": 25,
+      "file": "4.5/IMG_4305 copy.avif",
+      "ratio": "4:5",
+      "slug": "phone-bouquet",
+      "alt": "لقطة ليد تصوّر باقة الورد بالهاتف، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "details"
+    },
+    {
+      "n": 26,
+      "file": "3.2/2M4A1459 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "couple-veil-hall",
+      "alt": "لقطة للعروسين في قاعة الحفل مع طرحة طويلة ممتدة، مع طمس الوجوه حفاظًا على الخصوصية، من أعمال المصورة سندس يار",
+      "privacy": "both faces pixelated by owner (verified on an enlarged crop) — grid only",
+      "category": "couple"
+    },
+    {
+      "n": 27,
+      "file": "4.5/IMG_7663.JPG copy.avif",
+      "ratio": "4:5",
+      "slug": "rings-closeup",
+      "alt": "لقطة قريبة ليدي العروسين بخاتميهما، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 28,
+      "file": "3.2/IMG_3139.JPG copy.avif",
+      "ratio": "3:2",
+      "slug": "emotional-mirror",
+      "alt": "لقطة مؤثرة لرجل بالثوب والشماغ يمسح دموعه أمام المرآة، من أعمال المصورة سندس يار",
+      "privacy": "a man's face partly covered by his hand (men are shown on the owner's Instagram)",
+      "category": "moments"
+    },
+    {
+      "n": 29,
+      "file": "4.5/2M4A3396 ستوري.jpg copy.avif",
+      "ratio": "4:5",
+      "slug": "hand-through-veil",
+      "alt": "لقطة ليد العروس على كتف العريس بالبشت المطرّز بالذهبي من خلف الطرحة، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "couple"
+    },
+    {
+      "n": 30,
+      "file": "3.2/IMG_3185.JPG copy.avif",
+      "ratio": "3:2",
+      "slug": "gown-bisht-hangers",
+      "alt": "لقطة لفستان العروس وبشت العريس معلّقين قبل الزفاف، من أعمال المصورة سندس يار",
+      "privacy": "hands only",
+      "category": "details"
+    },
+    {
+      "n": 31,
+      "file": "4.5/IMG_7748.JPG copy.avif",
+      "ratio": "4:5",
+      "slug": "fingers-linked",
+      "alt": "لقطة لإصبعي العروسين متشابكين مع الخاتم وكمّ الدانتيل، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 32,
+      "file": "3.2/2M4A8498 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "hands-silver-bisht",
+      "alt": "لقطة ليد العروس بخاتمها فوق يد العريس على بشت بحواف فضية، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands"
+    },
+    {
+      "n": 33,
+      "file": "../extra-2026-10/2x3/2M4A1926 copy.avif",
+      "ratio": "3:2",
+      "slug": "bride-ready-suite",
+      "alt": "العروس تجلس على طرف السرير بفستانها الأبيض قبل الحفل، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 34,
+      "file": "../extra-2026-10/2x3/2M4A1972 copy.avif",
+      "ratio": "3:2",
+      "slug": "lipstick-detail",
+      "alt": "لقطة قريبة للعروس وهي تضع أحمر الشفاه، مع تفاصيل الدانتيل على كتفها، من أعمال المصورة سندس يار",
+      "privacy": "partial face",
+      "category": "details",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 35,
+      "file": "../extra-2026-10/2x3/2M4A2024 copy.avif",
+      "ratio": "3:2",
+      "slug": "bride-gown-hanger",
+      "alt": "العروس تتأمل فستانها المعلّق قبل ارتدائه، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 36,
+      "file": "../extra-2026-10/2x3/2M4A2212 copy.avif",
+      "ratio": "3:2",
+      "slug": "bride-veil-window",
+      "alt": "العروس بطرحتها الطويلة تمسك باقتها بجانب النافذة، من أعمال المصورة سندس يار",
+      "privacy": "face covered by watermark",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 37,
+      "file": "../extra-2026-10/2x3/2M4A2218 copy.avif",
+      "ratio": "3:2",
+      "slug": "bride-under-veil",
+      "alt": "العروس تحت الطرحة في لقطة ناعمة قريبة، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 39,
+      "file": "../extra-2026-10/2x3/2M4A4125-1 copy.avif",
+      "ratio": "3:2",
+      "slug": "henna-hand-bisht",
+      "alt": "يد العروس المزيّنة بالحناء على بشت العريس، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 40,
+      "file": "../extra-2026-10/2x3/2M4A4589 copy 2.avif",
+      "ratio": "3:2",
+      "slug": "groom-entrance",
+      "alt": "دخول العريس وسط الحضور بالبشوت والأشمغة، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 41,
+      "file": "../extra-2026-10/2x3/37EAB681-44A0-445B-9166-F4342944D9A6 copy.avif",
+      "ratio": "3:2",
+      "slug": "couple-embrace-hall",
+      "alt": "عناق العروسين في القاعة، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "couple",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 42,
+      "file": "../extra-2026-10/4x5/2M4A1894 copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-holding-shoe",
+      "alt": "العروس تجلس وتمسك حذاءها بفستان مطرّز، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 43,
+      "file": "../extra-2026-10/4x5/2M4A2046 copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-full-gown",
+      "alt": "العروس بفستانها الطويل وذيله الممتد بجانب نافذة واسعة، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 44,
+      "file": "../extra-2026-10/4x5/2M4A2085 copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-veil-standing",
+      "alt": "العروس واقفة بطرحتها أمام الستائر الرمادية، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 45,
+      "file": "../extra-2026-10/4x5/2M4A2139 copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-bouquet-gaze",
+      "alt": "العروس تنظر إلى باقتها بفستان مطرّز بالدانتيل، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 46,
+      "file": "../extra-2026-10/4x5/2M4A2148 copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-smile-bouquet",
+      "alt": "ابتسامة العروس وهي تحمل باقة زهور بألوان ناعمة، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 47,
+      "file": "../extra-2026-10/4x5/2M4A2203 copy.avif",
+      "ratio": "4:5",
+      "slug": "bride-veil-bouquet",
+      "alt": "العروس بفستان مكشوف الكتفين وطرحة طويلة مع باقتها، من أعمال المصورة سندس يار",
+      "privacy": "face covered by watermark",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 48,
+      "file": "../extra-2026-10/4x5/2M4A2306 copy.avif",
+      "ratio": "4:5",
+      "slug": "ring-on-bouquet",
+      "alt": "يد العروس بخاتمها على باقة الزهور، من أعمال المصورة سندس يار",
+      "privacy": "partial face",
+      "category": "hands",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 49,
+      "file": "../extra-2026-10/4x5/2M4A3908 copy 3.avif",
+      "ratio": "4:5",
+      "slug": "groom-ring-bisht",
+      "alt": "يد العريس بخاتمه على بشت مطرّز بالذهبي، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 50,
+      "file": "../extra-2026-10/4x5/2M4A3930 copy 3.avif",
+      "ratio": "4:5",
+      "slug": "groom-hands-watch",
+      "alt": "يدا العريس بالخاتم والساعة على البشت، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "hands",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 51,
+      "file": "../extra-2026-10/4x5/2M4A3940 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "groom-shemagh",
+      "alt": "العريس يعدّل شماغه ببشته البني، من أعمال المصورة سندس يار",
+      "privacy": "face visible",
+      "category": "moments",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 52,
+      "file": "../extra-2026-10/4x5/2M4A4183 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "couple-hands-tulips",
+      "alt": "يدا العروسين فوق باقة التوليب الأبيض، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "couple",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 53,
+      "file": "../extra-2026-10/4x5/2M4A4502 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "groom-pours-coffee",
+      "alt": "العريس يصبّ القهوة في فنجان تحمله العروس، من أعمال المصورة سندس يار",
+      "privacy": "partial face",
+      "category": "couple",
+      "added": "2026-10-01"
+    },
+    {
+      "n": 54,
+      "file": "../extra-2026-10/4x5/2M4A4568 copy 2.avif",
+      "ratio": "4:5",
+      "slug": "couple-tulip-bouquet",
+      "alt": "يد العريس على باقة العروس بفستانها الأصفر، من أعمال المصورة سندس يار",
+      "privacy": "no faces",
+      "category": "couple",
+      "added": "2026-10-01"
+    }
+  ],
+  "products": [
+    {
+      "file": "album-sizes.PNG",
+      "publish": true,
+      "slug": "album-sizes",
+      "alt": "صورة لألبومين بمقاسين مختلفين، 30×45 سم و23×32 سم، للمقارنة بين أحجام الألبومات",
+      "note": "shows two of the three sizes in packages.ts (small 23×32, medium 30×45)"
+    },
+    {
+      "file": "magazine.jpeg",
+      "publish": true,
+      "slug": "magazine",
+      "alt": "صورة لمجلة الصور بغلاف وردي",
+      "note": "the magazine add-on"
+    },
+    {
+      "file": "individual-print-sizes.jpeg",
+      "publish": false,
+      "reason": "shows a fully identifiable bride face — NEVER publish; backup only"
+    },
+    {
+      "file": "wooden-enlargement-01.jpeg",
+      "publish": false,
+      "reason": "labelled «مكبرة مقاس 50x70» but packages.ts sells the wooden enlargement as 30×40 cm — misleading; owner must confirm"
+    },
+    {
+      "file": "wooden-enlargement-02.jpeg",
+      "publish": false,
+      "reason": "phone snapshot of an A4 sheet on a board; unclear meaning — owner must confirm"
+    },
+    {
+      "file": "magazine-demo.MP4",
+      "publish": false,
+      "reason": "7.7 MB video; no transcoder available — backup only"
+    }
+  ],
+  "categories": [
+    {
+      "id": "details",
+      "label": "التفاصيل"
+    },
+    {
+      "id": "hands",
+      "label": "الأيادي والخواتم"
+    },
+    {
+      "id": "couple",
+      "label": "العروسان"
+    },
+    {
+      "id": "moments",
+      "label": "لحظات من اليوم"
+    }
+  ],
+  "_categories_note": "Portfolio filter (D12). Assigned by the orchestrator from the visual review; «الكل» (all) is added by the UI."
+}

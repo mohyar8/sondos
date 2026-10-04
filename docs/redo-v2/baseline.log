@@ -1,0 +1,49 @@
+﻿=== npm ci  2026-09-23T21:05:45
+
+added 269 packages in 44s
+=== npm run lint  exit follows
+
+> app@0.0.0 lint
+> eslint .
+
+
+C:\Users\azooz\Desktop\sundus-yar\app\src\components\AuthDialog.tsx
+  285:30  warning  The ref value 'completionFocusRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'completionFocusRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+C:\Users\azooz\Desktop\sundus-yar\app\src\components\BlockedDatesManager.tsx
+  323:9  warning  The 'blockedDates' conditional could make the dependencies of useMemo Hook (at line 334) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'blockedDates' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+✖ 2 problems (0 errors, 2 warnings)
+
+LINT_EXIT=0
+=== npm run build
+
+> app@0.0.0 build
+> tsc -b && vite build
+
+vite v8.2.1 building sundus_yar_website environment for production...
+[2K
+transforming...✓ 70 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/sundus_yar_website/.vite/manifest.json    0.15 kB │ gzip:  0.11 kB
+dist/sundus_yar_website/wrangler.json          1.53 kB │ gzip:  0.79 kB
+dist/sundus_yar_website/index.js             123.72 kB │ gzip: 29.05 kB
+
+✓ built in 786ms
+vite v8.2.1 building client environment for production...
+[2K
+transforming...✓ 51 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/client/.assetsignore                      0.02 kB
+dist/client/index.html                         0.66 kB │ gzip:   0.41 kB
+dist/client/assets/brand-logo-C1zhfPmY.jpeg  510.93 kB
+dist/client/assets/index-t-RgNm9e.css         79.88 kB │ gzip:  12.73 kB
+dist/client/assets/index-CvB458_J.js         470.79 kB │ gzip: 130.93 kB
+
+✓ built in 1.36s
+BUILD_EXIT=0
+=== git status (must be clean)
+?? .wrangler/
+DONE 2026-09-23T21:07:58

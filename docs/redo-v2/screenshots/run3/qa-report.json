@@ -1,0 +1,34 @@
+{
+  "pages": [
+    {
+      "label": "journey-hub-desktop-1440",
+      "url": "http://localhost:5173/preview.html?screen=my-bookings",
+      "width": 1440,
+      "title": "معاينة داخلية — ليست جزءًا من الموقع",
+      "h1": "حجوزاتي",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 3947,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run3\\journey-hub-desktop-1440.jpg"
+    },
+    {
+      "label": "journey-hub-mobile-375",
+      "url": "http://localhost:5173/preview.html?screen=my-bookings",
+      "width": 375,
+      "title": "معاينة داخلية — ليست جزءًا من الموقع",
+      "h1": "حجوزاتي",
+      "overflowX": 0,
+      "brokenImages": [],
+      "imagesWithoutSize": [],
+      "robots": null,
+      "height": 6112,
+      "consoleErrors": [],
+      "file": "C:\\Users\\azooz\\Desktop\\sundus-yar\\runs\\redo-v2\\screenshots\\run3\\journey-hub-mobile-375.jpg"
+    }
+  ],
+  "lightbox": null,
+  "menu": null
+}

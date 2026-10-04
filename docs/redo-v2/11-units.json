@@ -1,0 +1,2807 @@
+[
+ {
+  "id": "W0-01",
+  "title": "Adversarial review of the baseline (was G0-1)",
+  "wave": 0,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w0-baseline-attack.md"
+  ],
+  "depends_on": [],
+  "acceptance": [
+   "Attacks c80f4c2: JWT edge cases (alg, kid, aud, clock skew), admin guard bypass on both dispatchers, gates.ts bypasses (percent-encoding, case, //, trailing slash, NFKC, synonym paths), request.ts caps (chunked bodies, understated Content-Length), IDOR in /api/bookings/me and admin detail, CSP gaps, secrets hygiene (git log -p key scan, stale worker-configuration.d.ts names), npm audit --omit=dev, lockfile integrity, headers on SPA fallback",
+   "Re-checks every 10-security-baseline SEC finding at HEAD and maps each go-live blocker (C-1…C-17) to its combined unit id",
+   "Every finding has severity, reproduction and an owner unit; zero open criticals before wave 1"
+  ],
+  "security_controls": [
+   "Read-only, local only, no production access",
+   "No secret values or customer data in the report",
+   "Two independent reviewers (appsec + domain)"
+  ]
+ },
+ {
+  "id": "W0-02",
+  "title": "Threat-model traceability and decision record (was G0-2; the model itself is 13-threat-model.md)",
+  "wave": 0,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w0-traceability.md",
+   "runs/redo-v2/decisions.md"
+  ],
+  "depends_on": [],
+  "acceptance": [
+   "Every TM-nn, B/H/M/L and UX-nn item of 11 §0 and 12 §0 maps to a unit id and a test id (N-nn or A-n)",
+   "Abuse cases include hold squatting through fake deposit notices (UX-02 variant A) and IBAN/WhatsApp swap under the 24 h delay (TM-03)",
+   "decisions.md records the owner decisions of 2026-09-28, the R1 override (MFA optional at launch; D15) and the owner answers to 11 §9 as they arrive; nothing else in decisions.md changes"
+  ],
+  "security_controls": [
+   "Owner-approved wording only",
+   "No secrets or personal data",
+   "Reviewed by the architect and the appsec reviewer"
+  ]
+ },
+ {
+  "id": "W0-03",
+  "title": "Old-database and account inventory (new; owner-executed, read-only)",
+  "wave": 0,
+  "role": "data",
+  "files": [
+   "runs/redo-v2/release/w0-inventory.md"
+  ],
+  "depends_on": [],
+  "acceptance": [
+   "Counts (never rows) from D1 sundus-yar-bookings: users, admins, bookings in blocking statuses with event_date >= Riyadh today, blocked_dates >= today; migrations list --remote (D8)",
+   "Records the currently deployed version id of sundus-yar-website as the pre-launch version (B3)",
+   "Operational checks O-1…O-3 of the baseline: email-enumeration protection state, version Preview URLs disabled, admin rows; 2FA on the Cloudflare and Firebase owner accounts (TM-23)",
+   "Any non-zero future booking or blocked-date count opens 11 §9 Q3 before W7-01"
+  ],
+  "security_controls": [
+   "Read-only SELECT COUNT(*) commands only, each approved by the owner before it runs",
+   "No personal data copied into the report",
+   "No writes, no deploys"
+  ]
+ },
+ {
+  "id": "W1-01",
+  "title": "Migrations 0007 + 0008 and the local seed (was G1-1; adds 0008)",
+  "wave": 1,
+  "role": "data",
+  "files": [
+   "migrations/0007_golive_admin_settings.sql",
+   "migrations/0008_golive_hardening.sql",
+   "scripts/dev-seed.sql",
+   "scripts/seed-local.mjs",
+   "runs/redo-v2/d1/0007-0008-verification.md"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "11 §2.2 and §2.4 DDL committed byte-for-byte (any change is re-verified); 5 files justified: both migrations are verified together and the seed depends on both",
+   "Fresh local D1 applies 0001, 0003-0008 with wrangler (27 tables, 23 indexes, 12 triggers); tests/migrations.test.mjs re-runs the 56 + 42 checks of §2.3 and §2.5 with node:sqlite",
+   "seed-local.mjs --customer-uid <uid> creates one booking per journey stage (distinct dates), a notice-protected overdue hold, fake customers (@example.test, ids seed-…) and the _dev_seed_marker table; no settings, bank data or admin"
+  ],
+  "security_controls": [
+   "Script hard-codes --local and refuses --remote/--env; uid validated ^[A-Za-z0-9]{1,128}$ before templating",
+   "wrangler run through spawn with an argument array (no shell)",
+   "Append-only and no-delete triggers (SB-10, L2); production preflight asserts _dev_seed_marker is absent",
+   "SB-4, SB-8"
+  ]
+ },
+ {
+  "id": "W1-02",
+  "title": "Token claims, admin binding, session freshness and re-auth guards (was G1-2 + C-1, TM-02, TM-07, C-14)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "worker/auth.ts",
+   "worker/admin-auth.ts",
+   "worker/recent-auth.ts",
+   "shared/admin-session.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02",
+   "W1-01"
+  ],
+  "acceptance": [
+   "AuthenticatedFirebaseUser gains authTime and secondFactor (additive; existing callers unchanged)",
+   "authorizeAdminRequest also requires lower(users.email) = lower(token email), auth_time within 12 h and auth_time >= users.tokens_valid_after, read in the same D1 query; failures -> 403 REAUTH_REQUIRED (N-32, N-44)",
+   "recent-auth.ts: requireRecentSignIn (admin, 600 s), requireRecentCustomerSignIn (600 s), requireMediaFreshSignIn (12 h), requireSecondFactor (ADMIN_MEDIA_MFA counts as off only for the exact value \"off\"), requireSettingsSecondFactor (ADMIN_SETTINGS_2F)",
+   "reauthAtFromToken() is the only source of reauthAt (auth_time, never iat or now); tests/recent-auth.test.mjs tells iat and auth_time apart (M1)"
+  ],
+  "security_controls": [
+   "C-1, TM-02, TM-07, C-14, TM-21, M1",
+   "Claims validated as finite numbers <= now; fail closed on missing claims",
+   "No token or email logging (SB-7)",
+   "SB-1, SB-14, SB-18"
+  ]
+ },
+ {
+  "id": "W1-03",
+  "title": "Platform config and private-media gate v2 (was G1-3 + TM-10, C-4/C-8 config, SEC-13)",
+  "wave": 1,
+  "role": "fullstack",
+  "files": [
+   "wrangler.jsonc",
+   "worker-configuration.d.ts",
+   "worker/platform-env.d.ts",
+   "worker/portal/gates.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "account_id, preview_urls false, D1 DB -> sundus-yar-production (placeholder id), ONLINE_CONFIRMATION \"on\", FIREBASE_PROJECT_ID placeholder, ADMIN_MEDIA_MFA \"required\", ADMIN_SETTINGS_2F \"off\"; env.mediatest local-only with R2 MEDIA",
+   "ratelimits bindings RL_BOOKING, RL_PROFILE, RL_CUSTOMER_WRITE, RL_UPLOAD, RL_AVAILABILITY, RL_CSP_REPORT, RL_ADMIN_READ (60 s periods) in production and preview",
+   "env.preview: dev Firebase project id, PREVIEW_READ_ONLY \"on\", preview_urls false (M4, C-8, TM-24)",
+   "gates.ts: getMediaBucket(env) returns null unless isPrivateMediaAllowed(env) (OC ∧ PDPL ∧ R2 shape ∧ KEY); PRIVATE_MEDIA_SEGMENTS extended with upload(s), file(s), image(s), picture(s), attachment(s), proof(s), slip(s), document(s), download(s), pdf, thumb(s), preview(s); getPrivateMediaBlockers; build output has no r2_buckets"
+  ],
+  "security_controls": [
+   "TM-10 single choke point; runtime structural guard, never the generated type",
+   "All flags fail closed",
+   "Key length checked without logging the key",
+   "SB-8, SB-11"
+  ]
+ },
+ {
+  "id": "W1-04",
+  "title": "Worker route slots and central ownership (was G1-4 + C-16/TM-06)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "worker/portal/portal-routes.ts",
+   "worker/portal/admin-portal-routes.ts",
+   "worker/portal/owned-booking.ts",
+   "worker/portal/slots/confirmation.ts",
+   "worker/portal/slots/receipts.ts",
+   "worker/portal/slots/event-profile.ts",
+   "worker/portal/slots/handover.ts",
+   "worker/portal/slots/feedback.ts",
+   "worker/portal/slots/gallery.ts",
+   "worker/portal/slots/media.ts",
+   "worker/portal/slots/admin-settings.ts",
+   "worker/portal/slots/admin-audit.ts",
+   "worker/portal/slots/admin-booking-log.ts",
+   "worker/portal/slots/admin-event-profile.ts",
+   "worker/portal/slots/admin-production.ts",
+   "worker/portal/slots/admin-handover.ts",
+   "worker/portal/slots/admin-feedback.ts",
+   "worker/portal/slots/admin-queue.ts",
+   "worker/portal/slots/admin-directory.ts",
+   "worker/portal/slots/admin-export.ts",
+   "worker/portal/slots/admin-search.ts",
+   "worker/portal/slots/admin-receipts.ts",
+   "worker/portal/slots/admin-gallery.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "Justified > 4: behaviour-free typed empty slot arrays reviewed as one; they remove every later shared-registry edit",
+   "Customer dispatcher: requireVerifiedCustomer -> resolveOwnedBooking (SELECT id, status, flow_version, event_date, hold_expires_at … WHERE id=? AND user_id=?) -> identical 404 body for foreign and non-existent ids; handlers receive OwnedBooking",
+   "assertPrivateMediaRoutesGated runs over the concatenated registries; admin namespaces extended with settings, calendar, customers, exports, audit-log, session, search; existing responses unchanged (404 for unregistered paths)"
+  ],
+  "security_controls": [
+   "C-16, TM-06: ownership resolved once, handlers still bind user_id in writes (SB-20)",
+   "E1 kept; explicit greppable registrations, no dynamic imports",
+   "SB-2, SB-11"
+  ]
+ },
+ {
+  "id": "W1-05",
+  "title": "UI registry slots and shared panel styles (was G1-5 + UX-05 order, UX-12 contrast, UX-13 targets)",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "src/features/journey/stage-views.ts",
+   "src/features/admin-portal/sections.ts",
+   "src/features/journey/stage-panels.css",
+   "src/features/admin-portal/admin-panels.css",
+   "src/features/confirmation/registration.ts",
+   "src/features/event-profile/registration.ts",
+   "src/features/handover/registration.ts",
+   "src/features/feedback/registration.ts",
+   "src/features/gallery/registration.ts",
+   "src/features/admin-settings/registration.ts",
+   "src/features/admin-queue/registration.ts",
+   "src/features/admin-calendar/registration.ts",
+   "src/features/admin-customers/registration.ts",
+   "src/features/admin-audit/registration.ts",
+   "src/features/admin-contact/registration.ts",
+   "src/features/admin-timeline/registration.ts",
+   "src/features/admin-deposit/registration.ts",
+   "src/features/admin-event-profile/registration.ts",
+   "src/features/admin-production/registration.ts",
+   "src/features/admin-handover/registration.ts",
+   "src/features/admin-feedback/registration.ts",
+   "src/features/admin-receipt/registration.ts",
+   "src/features/admin-gallery/registration.ts",
+   "src/features/admin-security/registration.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "Justified > 4: mechanical stubs plus two token-based stylesheets; with every stub empty the hub and dashboard render exactly as today",
+   "Section descriptors carry fixed numeric order values (summary 0, actions 10, contact 20, deposit 30, receipts 35, handover 40, production 50, gallery 55, event profile 60, timeline 70, feedback 80); workspace tabs carry group primary|more (UX-05)",
+   "Panel CSS: accent text only on paper/surface, --color-accent-deep on sunk/tint/hairline backgrounds, --color-accent-soft only on ink or dark photos (UX-12); every control >= 44 x 44 CSS px with >= 8 px spacing (UX-13); existing tokens only; no edit to src/styles/*.css"
+  ],
+  "security_controls": [
+   "Descriptors import components lazily only",
+   "No inline styles from data",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W1-06",
+  "title": "Settings contracts, deposit math, effective/pending read side and features (was G1-6 + M3, TM-03, H3, B1)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "shared/settings.ts",
+   "shared/deposit.ts",
+   "worker/settings/settings-read.ts",
+   "worker/settings/features.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02",
+   "W1-01",
+   "W1-03"
+  ],
+  "acceptance": [
+   "Typed section inputs and guards (IBAN normalise + mod-97; WhatsApp digits; lengths = DB CHECKs); computeDeposit integer-only with worked examples",
+   "Effective revision = highest id with COALESCE(effective_at, created_at) <= now; pending revision per section (verified §2.5)",
+   "features.ts (all exports needed by wave 2, including blockers; M3): onlineConfirmation {switchOn, killSwitch, settingsComplete, missing, offered}, privateMedia.blockers (incl. ADMIN_MFA_DISABLED), email.configured, holdAutoExpiry = EM ∧ OCe, settings2f",
+   "Every SQL string prepared against 0007 + 0008 in tests/settings-read.test.mjs"
+  ],
+  "security_controls": [
+   "No float money math; integers bounded",
+   "IBAN never logged; read-only module",
+   "TM-03, TM-21, H3",
+   "SB-3, SB-4, SB-7"
+  ]
+ },
+ {
+  "id": "W1-07",
+  "title": "API client v2 and forward-compatible admin parser (was G1-7 + L1)",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "src/lib/api-client.ts",
+   "src/api/admin.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "requestBlob (CSV; checks Content-Type), upload (XHR with progress and abort), postJson, keepalive option; REAUTH_REQUIRED, SECOND_FACTOR_REQUIRED and RATE_LIMITED recognised with their Arabic messages",
+   "The admin detail parser ignores unknown allowedActions entries, so a tab running an older bundle keeps working when new actions ship (L1)",
+   "Existing callers unchanged"
+  ],
+  "security_controls": [
+   "Only same-origin /api/ paths; token never in a URL",
+   "Responses parsed by caller guards; no logging",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W1-08",
+  "title": "Re-auth dialog (admin and customer), idle sign-out API and displayName fix (was G1-8 + UX-16, C-15, TM-07, TM-08)",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "src/auth/AuthContext.tsx",
+   "src/auth/auth-context.ts",
+   "src/features/reauth/ReauthDialog.tsx",
+   "src/features/reauth/use-reauth-retry.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "reauthenticateWithPassword inside the single provider; accessible dialog (labelled, focus-trapped, Escape cancels, focus returns) usable by admin and customer, feminine copy",
+   "A read-only autocomplete=\"username\" field with the account email plus current-password; after success shows «التحقق صالح حتى {time}» (UX-16); the hook retries the original request once",
+   "startIdleSignOut(minutes) on the context (pointerdown/keydown activity, cleaned up) for the admin shell (TM-07); displayName no longer set from the full name (C-15); an MFA challenge surfaces as \"use the MFA sign-in\" until W5-01"
+  ],
+  "security_controls": [
+   "Password held only in component state and cleared on close; never logged or stored",
+   "No new Firebase listener; one AuthProvider",
+   "SB-12, SB-14, SB-18"
+  ]
+ },
+ {
+  "id": "W1-09",
+  "title": "Admin audit writer with SQL-stamped time (was G1-9 + M1, L2)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "worker/audit/admin-audit.ts",
+   "shared/audit.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02",
+   "W1-01"
+  ],
+  "acceptance": [
+   "Typed action union = 0007 + 0008 vocabulary; auditStatement(...) returns a prepared statement for the caller batch",
+   "INSERT stamps created_at with strftime('%Y-%m-%dT%H:%M:%fZ','now'), never a bound value (M1)",
+   "Per-action details allowlist builders (ids, counts, dates, section names only)"
+  ],
+  "security_controls": [
+   "details <= 2,000 chars enforced before the DB; no PII fields possible by type",
+   "SB-10, SB-13"
+  ]
+ },
+ {
+  "id": "W1-10",
+  "title": "Shared text validator, payment-instruction detector, digit normaliser and Riyadh time helpers (new: TM-12, TM-04, UX-07, M2, C-3)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "shared/text.ts",
+   "shared/timing.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "normalizeFreeText: NFC; refuses C0/C1 (optional newlines), U+061C, U+200E/F, U+202A-E, U+2066-9, U+200B, U+2060, U+FEFF, U+2028/9; allows ZWNJ/ZWJ; code-point caps; names also refuse URLs and @ handles (N-41)",
+   "findPaymentInstructionLike(text, studioDigits): IBAN-like tokens, digit runs >= 10, URL-like tokens (://, www., wa.me, t.me, bit.ly, bare domains), phone runs other than the studio number (N-33 table); toAsciiDigits for Arabic-Indic and Persian digits",
+   "timing.ts: riyadhStartOfDay, riyadhLocalToInstant, riyadhTodayKey and constants BOOKING_HORIZON_DAYS 730, HOLD_GRACE_HOURS 72, ADMIN_SESSION_MAX_HOURS 12, RECENT_SIGN_IN_SECONDS 600, SETTINGS_DELAY_HOURS 24; tests cover the 21:00-24:00 Riyadh boundary (M2)"
+  ],
+  "security_controls": [
+   "Pure functions, no I/O, no logging",
+   "Every free-text handler must call it (SB-16, SB-17); \"today\" is never SQL date('now')",
+   "TM-12, TM-04, M2"
+  ]
+ },
+ {
+  "id": "W1-11",
+  "title": "WhatsApp link library (was G1-11 + TM-19)",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "src/lib/whatsapp.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "toWaMeDigits (E.164 digits or null, any digit script), buildWhatsAppUrlFor(number, message), isolateLtr(); existing exports unchanged",
+   "Message length capped; the compiled public number stays the fallback and the check quoted to customers after a number change",
+   "Links for +9665…, 05…, Arabic-Indic digits, invalid input (button disabled with a reason)"
+  ],
+  "security_controls": [
+   "Number must match ^[1-9]\\d{7,14}$ or no link is produced; message only through encodeURIComponent",
+   "verify.mjs: no wa.me literal outside this file (TM-19)",
+   "SB-6, SB-12"
+  ]
+ },
+ {
+  "id": "W1-12",
+  "title": "Admin promotion by uid (was G1-12 + TM-02/B2, L2, TM-07)",
+  "wave": 1,
+  "role": "data",
+  "files": [
+   "scripts/promote-admin.mjs"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02",
+   "W1-01"
+  ],
+  "acceptance": [
+   "node scripts/promote-admin.mjs --database <name> --uid <uid> --email <email> (--local | --remote) [--replace]; --email without --uid is a usage error (N-31)",
+   "UPDATE users SET role='admin', tokens_valid_after=<SQL now> WHERE id=? AND lower(email)=lower(?) AND email_verified_at IS NOT NULL AND erased_at IS NULL must change exactly 1 row; shows uid and stored email before the typed confirmation",
+   "Writes admin_audit_log admin_promoted / admin_demoted with the promoted uid as actor in the same batch (L2); prints the Time Travel bookmark command first for --remote; verifies exactly one admin afterwards"
+  ],
+  "security_controls": [
+   "Only a uid validated ^[A-Za-z0-9]{1,128}$ and a validated email (quotes doubled) are templated",
+   "spawn with an argument array; never runs without an explicit target flag",
+   "No API writes users.role (grep gate)",
+   "SB-4, SB-10"
+  ]
+ },
+ {
+  "id": "W1-13",
+  "title": "Test harness, verify script and merge hooks (new: M6, TM-17, TM-10, TM-19, TM-14)",
+  "wave": 1,
+  "role": "fullstack",
+  "files": [
+   "package.json",
+   "scripts/verify.mjs",
+   ".githooks/pre-push",
+   ".githooks/pre-merge-commit"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "npm test = node --test on tests/ using node:test and node:sqlite only, with tests/setup/resolve-ts.mjs (a module.register hook mapping a missing .js specifier to its .ts sibling); no dependency",
+   "npm run verify = lint + tsc -b + build (classic and cinematic) + tests + grep gates: console.* args only literals or code=/count=/job= templates; no env.MEDIA outside gates.ts; no wa.me outside src/lib/whatsapp.ts; storage APIs only for sy:intro:v1; no innerHTML/dangerouslySetInnerHTML/eval/new Function; no data:image in dist/client; no users.role write except the customer insert",
+   "Hooks run verify on pre-push and block a merge commit into release/* unless verify passes; the RV gate records that verify ran"
+  ],
+  "security_controls": [
+   "No network access in tests; shell false for every spawn",
+   "No new dependency (package-lock unchanged)",
+   "SB-7, SB-19"
+  ]
+ },
+ {
+  "id": "W1-14",
+  "title": "Bounded bodies for legacy handlers and API security headers (new: C-5, C-9 API part)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "worker/http.ts",
+   "worker/profile.ts",
+   "worker/bookings.ts",
+   "worker/admin.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "readBoundedJson(request, maxBytes) in http.ts (Content-Length first, then a streamed byte counter so chunked bodies are capped) adopted by PUT /api/profile, POST /api/bookings and the blocked-dates handlers; over cap -> 413 (SEC-05 reproduction closed)",
+   "jsonResponse adds Strict-Transport-Security; existing behaviour otherwise identical (N-29)"
+  ],
+  "security_controls": [
+   "C-5, C-9",
+   "No body echo in errors",
+   "SB-3, SB-9"
+  ]
+ },
+ {
+  "id": "W1-15",
+  "title": "Rate-limit and windowed-cap helpers (new: TM-11, C-4 core)",
+  "wave": 1,
+  "role": "backend",
+  "files": [
+   "worker/ratelimit.ts",
+   "shared/limits.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02",
+   "W1-03"
+  ],
+  "acceptance": [
+   "limitBurst(binding, key) wrapper over the ratelimits binding (60 s); missing binding -> allow + code=RL_BINDING_MISSING (fail-open by design)",
+   "shared/limits.ts holds the §3.1 table and the SQL windowed-cap constants used inside writing statements; 429 RATE_LIMITED with Retry-After"
+  ],
+  "security_controls": [
+   "Keys are uid or the connecting IP, never logged",
+   "SQL caps remain the hard bound",
+   "SB-15"
+  ]
+ },
+ {
+  "id": "W1-16",
+  "title": "MOT-01 Design switch foundation (unset -> classic; assetsInlineLimit 0)",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "vite.config.ts",
+   "tsconfig.app.json",
+   "src/main.tsx",
+   "src/design/classic/boot.ts",
+   "src/design/cinematic/boot.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-01 as amended: 5 files justified; unset or empty VITE_SITE_DESIGN -> classic (H6); invalid value fails the build",
+   "build.assetsInlineLimit: 0 so no data: URI can be emitted (TM-14)",
+   "Classic build identical to design-classic-v1 in CSS/DOM; cinematic differs only by data-design on <html>"
+  ],
+  "security_controls": [
+   "Allowlisted flag values, fail closed",
+   "Flag never embedded in client code",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W1-17",
+  "title": "MOT-03 Intro logo rasters",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "scripts/make-brand-assets.mjs",
+   "src/data/brand-images.ts",
+   "public/images/brand/logo-ink-448.webp",
+   "public/images/brand/logo-ink-672.webp"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-03: existing brand files byte-identical; sizes <= 25 KB / 40 KB; visual check at 200%"
+  ],
+  "security_controls": [
+   "Reads only the local master; writes only public/images/brand/",
+   "No EXIF/XMP in outputs",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W1-18",
+  "title": "MOT-05 Route-chunk readiness API and loaded-module cache (+M5)",
+  "wave": 1,
+  "role": "frontend",
+  "files": [
+   "src/layout/retryable-lazy.ts",
+   "src/layout/lazy-components.ts"
+  ],
+  "depends_on": [
+   "W0-01",
+   "W0-02"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-05 as amended: whenReady() resolves on success and failure, never rejects; loadedModule() returns the resolved module synchronously once loaded (M5); routeReady(path)",
+   "Classic and cinematic behaviour unchanged (nothing calls it yet)"
+  ],
+  "security_controls": [
+   "No new rejection paths; failed-chunk re-arm logic untouched",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W1-RV",
+  "title": "Wave-1 adversarial review (was RV-1)",
+  "wave": 1,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w1-review.md"
+  ],
+  "depends_on": [
+   "W1-01",
+   "W1-02",
+   "W1-03",
+   "W1-04",
+   "W1-05",
+   "W1-06",
+   "W1-07",
+   "W1-08",
+   "W1-09",
+   "W1-10",
+   "W1-11",
+   "W1-12",
+   "W1-13",
+   "W1-14",
+   "W1-15",
+   "W1-16",
+   "W1-17",
+   "W1-18"
+  ],
+  "acceptance": [
+   "Two independent reviewers per unit (appsec + domain); every diff checked against SB-1…SB-20 and the unit's listed controls",
+   "Runs the database part of N-10, N-11…N-14, N-31, N-32, N-44, N-48, the migration tests, npm run verify and 12 A1/A2 for the motion units",
+   "Verifies C-1, C-5 and C-16 against their SEC acceptance (TM-01); critical/high findings fixed before wave 2 (the owner cannot waive them)"
+  ],
+  "security_controls": [
+   "Read-only review; local only",
+   "No production tokens"
+  ]
+ },
+ {
+  "id": "W2-01",
+  "title": "Admin settings API with delayed activation, content rules, kill switch and alerts (was G2-1 + TM-03, TM-04, TM-18, M1, H2, H3)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/settings/settings-write.ts",
+   "worker/settings/admin-settings-handlers.ts",
+   "worker/portal/slots/admin-settings.ts",
+   "worker/emails/admin-alert.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-02",
+   "W1-03",
+   "W1-04",
+   "W1-06",
+   "W1-09",
+   "W1-10",
+   "W1-15"
+  ],
+  "acceptance": [
+   "Endpoints #29-#34 and #43; revision + audit in one batch with SQL-stamped created_at; unchanged values -> unchanged: true",
+   "Bank/contact change to an existing revision without a 2F claim -> effective_at = now + 24 h; first-ever and 2F-backed saves immediate; re-saving the effective values cancels a pending change; ADMIN_SETTINGS_2F=required -> 2F for bank/contact/deposit/terms (N-45)",
+   "Content rules on pickup, delivery-area names, terms body and summary -> 400 CONTENT_NOT_ALLOWED (N-33); pickup is AD+R (N-34); switch off = AD, on = AD+R",
+   "Direct alert email to ADMIN_NOTIFICATION_EMAIL on each bank/contact/deposit/terms/switch change when email is configured (section and time only), skipped otherwise"
+  ],
+  "security_controls": [
+   "TM-03, TM-04, TM-12, TM-18, M1, H2, H3",
+   "RA/AD+S on sensitive writes; IBAN mod-97; E.164 digits; terms plain text only",
+   "Bank values never in audit details or alert emails",
+   "SB-2…SB-4, SB-10, SB-14, SB-17"
+  ]
+ },
+ {
+  "id": "W2-02",
+  "title": "Flow-aware booking state machine with grace, reinstate and offline confirmation (was G2-3 + C-17, B1, H3, TM-15, TM-20)",
+  "wave": 2,
+  "role": "fullstack",
+  "files": [
+   "shared/admin.ts",
+   "worker/admin-workflow.ts",
+   "worker/admin.ts",
+   "src/components/BookingActions.tsx"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-03",
+   "W1-06",
+   "W1-09",
+   "W1-10",
+   "W2-03",
+   "W2-04"
+  ],
+  "acceptance": [
+   "Action map of #18 incl. expire_hold, reinstate_hold, confirm_offline (AD+R); approve refuses past dates (SEC-19) and targets flow 2 only when OCe ∧ SET ∧ event >= today+3; targeted sweep excludes notice-protected holds and all flow-2 holds while AX is off",
+   "extend_hold is a compare-and-swap on status and the read hold_expires_at, allowed up to deadline + 72 h while approved_hold, never past the event start; confirm_payment allowed within the same grace (N-30b); reinstate only when the date is free (DATE_NOT_FREE)",
+   "BookingActions shows the flow approve will take, the amount field with the bank-statement hint (TM-20), hours for extend, required reasons; flow-1 behaviour byte-identical (N-29); status email skipped when unchanged; notes shown to customers pass the content rules"
+  ],
+  "security_controls": [
+   "Every transition conditional on status + flow + deadline in one batch with the changes() guard",
+   "Server clock only; integers within the total",
+   "B1, H3, C-17, TM-15, TM-20",
+   "SB-2, SB-3, SB-5, SB-9, SB-10"
+  ]
+ },
+ {
+  "id": "W2-03",
+  "title": "Hold lifecycle jobs: protected holds, no auto-expiry without email, channel-aware reminders (was G2-14 + B1, H3, TM-15)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/jobs/hold-state.ts",
+   "worker/jobs/hold-expiry.ts",
+   "worker/jobs/hold-reminders.ts",
+   "worker/emails/hold.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-06"
+  ],
+  "acceptance": [
+   "Exported NOTICE_PROTECTED predicate: a deposit_notice_sent event whose details.holdExpiresAt equals the current hold_expires_at; the cron never expires such holds (N-50)",
+   "The cron expires flow-2 holds only when holdAutoExpiry (EM ∧ OCe); otherwise overdue holds stay approved_hold for the queue decide_now section; the kill switch stops expiry (N-52)",
+   "Reminder copy chooses between accept the terms, transfer and send the receipt on WhatsApp, and upload the receipt; legacy rows untouched; new claims use crypto.randomUUID tokens"
+  ],
+  "security_controls": [
+   "B1, H3, TM-15",
+   "Escaped templates; bidi isolation of reference and phone; no PII in dedupe keys",
+   "SB-6, SB-13"
+  ]
+ },
+ {
+  "id": "W2-04",
+  "title": "Legacy email copy: flow-2 approval deadline and name isolation (new: B1 #5, C-13 email part)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/email-templates.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-10"
+  ],
+  "acceptance": [
+   "New status-email variant for flow-2 approvals stating the deadline (Riyadh time, isolated), the deposit amount and that the steps continue on the bookings page; flow-1 copy unchanged",
+   "Names and references wrapped in bidi isolation after escapeHtml in every legacy template"
+  ],
+  "security_controls": [
+   "No bank details in any email (portal only)",
+   "SB-6",
+   "B1, TM-12"
+  ]
+ },
+ {
+  "id": "W2-05",
+  "title": "Audit log, session, timeline, contact log and sign-out-everywhere API (was G2-4 + TM-07, UX-06)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/audit/admin-audit-handlers.ts",
+   "worker/portal/admin-booking-log.ts",
+   "worker/portal/slots/admin-audit.ts",
+   "worker/portal/slots/admin-booking-log.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-02",
+   "W1-04",
+   "W1-09"
+  ],
+  "acceptance": [
+   "#20, #21 (outcome opened|sent|dismissed -> admin_whatsapp_opened/sent/admin_queue_dismissed), #39, #40 (sessionFreshUntil, idleMinutes), #44 revoke-all (AD+R, tokens_valid_after = SQL now, audit admin_sessions_revoked)",
+   "Timeline merges three sources, <= 300 entries, notification rows without recipient or payload"
+  ],
+  "security_controls": [
+   "Admin-only; redacted notes stay hidden; keyset cursors validated",
+   "TM-07, UX-06",
+   "SB-2, SB-7, SB-13, SB-18"
+  ]
+ },
+ {
+  "id": "W2-06",
+  "title": "Event profile and consent with recent sign-in to grant (was G2-5 + TM-08, TM-11, TM-12)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/event-profile.ts",
+   "worker/portal/event-profile.ts",
+   "worker/portal/slots/event-profile.ts",
+   "worker/portal/slots/admin-event-profile.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-02",
+   "W1-04",
+   "W1-10",
+   "W1-15"
+  ],
+  "acceptance": [
+   "#6-#8 and #22 on OwnedBooking; consent default NO; grant needs CO+R (N-39); withdrawal always allowed",
+   "Events written only when a value changes; consent changes <= 10 per booking per day; burst limit (N-40)",
+   "Every free-text field through the shared validator; admin view returns grantedAt for the \"not yet confirmed by the studio\" label"
+  ],
+  "security_controls": [
+   "Ownership central + user_id bound in writes (TM-06)",
+   "Free text treated as PII (never logged, purge-ready)",
+   "TM-08, TM-11, TM-12",
+   "SB-2, SB-3, SB-13, SB-15, SB-16"
+  ]
+ },
+ {
+  "id": "W2-07",
+  "title": "Production (album) status (was G2-6)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/production.ts",
+   "worker/portal/production.ts",
+   "worker/portal/slots/admin-production.ts",
+   "worker/emails/album.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-04",
+   "W1-10"
+  ],
+  "acceptance": [
+   "#23 on the production path (open while media is gated); event-passed rule uses the Riyadh date key; album_stage_changed; album_ready queued once only if EM"
+  ],
+  "security_controls": [
+   "Admin-only; stage enum; outbox dedupe; escaped copy",
+   "SB-2, SB-5, SB-6"
+  ]
+ },
+ {
+  "id": "W2-08",
+  "title": "Handover slots and admin handover with in-statement capacity rules (was G2-7 + TM-15, M2)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/handover.ts",
+   "worker/portal/admin-handover-slots.ts",
+   "worker/portal/admin-handover.ts",
+   "worker/portal/slots/admin-handover.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-04",
+   "W1-09",
+   "W1-10"
+  ],
+  "acceptance": [
+   "#24, #28 incl. bulk generate (<= 200, Riyadh -> UTC via riyadhLocalToInstant)",
+   "Capacity decrease is a conditional UPDATE; deactivation refused while scheduled handovers exist; reassign uses the capacity predicate excluding its own row; completion stamps both completed_at columns in one batch; audit rows"
+  ],
+  "security_controls": [
+   "Generation bounds (range <= 92 d, <= 200 slots, times validated)",
+   "Admin-only",
+   "TM-15",
+   "SB-4, SB-5, SB-10"
+  ]
+ },
+ {
+  "id": "W2-09",
+  "title": "Feedback (was G2-8 + TM-12, TM-11)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/feedback.ts",
+   "worker/portal/feedback.ts",
+   "worker/portal/slots/feedback.ts",
+   "worker/portal/slots/admin-feedback.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-04",
+   "W1-10",
+   "W1-15"
+  ],
+  "acceptance": [
+   "#12, #25 on OwnedBooking; compare-on-retry; never published; comment through the shared validator"
+  ],
+  "security_controls": [
+   "Ownership; one row per booking (PK); comment <= 1000 rendered as text",
+   "SB-2, SB-3, SB-6, SB-15, SB-16"
+  ]
+ },
+ {
+  "id": "W2-10",
+  "title": "Work queue API: decide-now, fixed priority, one-tap WhatsApp data (was G2-9 + B1, UX-02, UX-03, UX-05, UX-06, TM-03)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/admin-queue.ts",
+   "worker/portal/admin-queue.ts",
+   "worker/portal/slots/admin-queue.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-04",
+   "W1-06",
+   "W1-10",
+   "W2-03"
+  ],
+  "acceptance": [
+   "#35 shape: summary, health (incl. cspViolations24h), alerts (SETTINGS_CHANGE_PENDING, KILL_SWITCH_OFF…), sections in the fixed order with decide_now first; empty sections omitted",
+   "Items carry reference, waDigits (validated ^[1-9]\\d{7,14}$), templateInputs, lastContact; today/tomorrow events add startTime and venueArea",
+   "An item leaves only on a state change or a sent/dismissed contact-log row (UX-06); seeded data shows every section; <= 50 items per section"
+  ],
+  "security_controls": [
+   "Admin-only; first names only; waDigits used only in hrefs (never rendered as text)",
+   "SB-13 minimisation note lists the admin-only fields",
+   "B1, UX-02, UX-03, UX-05, UX-06",
+   "SB-2, SB-13"
+  ]
+ },
+ {
+  "id": "W2-11",
+  "title": "Calendar and customers directory (was G2-10; search moves to W3-02)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/admin-directory.ts",
+   "worker/portal/admin-calendar.ts",
+   "worker/portal/admin-customers.ts",
+   "worker/portal/slots/admin-directory.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-04",
+   "W1-10"
+  ],
+  "acceptance": [
+   "#36, #37 without q; month parsing strict; keyset on users (created_at, id) with its own cursor validator (CURRENT_TIMESTAMP format); erased users excluded; contactChangedAt exposed"
+  ],
+  "security_controls": [
+   "Limits <= 100; admin-only",
+   "SB-2, SB-4"
+  ]
+ },
+ {
+  "id": "W2-12",
+  "title": "CSV export with extended neutralisation (was G2-11 + TM-13)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/csv.ts",
+   "worker/portal/admin-export.ts",
+   "worker/portal/slots/admin-export.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-02",
+   "W1-04",
+   "W1-09"
+  ],
+  "acceptance": [
+   "#38 exactly; worker/csv.ts pure functions with tests/csv.test.mjs covering =HYPERLINK, +SUM, -1+1, @cmd, TAB/CR, full-width ＝＋－＠, |cmd, U+202E, U+2028, zero-width (N-09, N-42)",
+   "Numeric columns emitted as unprefixed integers; the file opens with Arabic intact in Excel, LibreOffice, Google Sheets and Numbers"
+  ],
+  "security_controls": [
+   "RA; range and row caps; audit row written before the body is returned",
+   "Attachment disposition with an ASCII filename; X-Frame-Options DENY",
+   "TM-13",
+   "SB-6, SB-10, SB-14"
+  ]
+ },
+ {
+  "id": "W2-13",
+  "title": "Customer confirmation API: effective bank details, accepted-terms view, protecting notices (was G2-12 + TM-03, TM-16, TM-18, B1, UX-08)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/portal/confirmation.ts",
+   "worker/portal/confirmation.ts",
+   "worker/portal/slots/confirmation.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-03",
+   "W1-04",
+   "W1-06",
+   "W1-10",
+   "W1-15"
+  ],
+  "acceptance": [
+   "#2-#4: OCe closed -> 503; bank details from the effective revision only after acceptance, IBAN normalised (24 chars); bankDetailsChangedSinceAcceptance; studio number and change time",
+   "acceptedTerms returns the exact accepted version read-only; terms_accepted details carry bodySha256 (TM-18)",
+   "The notice records once per deadline, never changes status or deadline, returns holdProtected: true; accepted within the grace window while approved_hold; IDOR and stale-version cases (N-04, N-16, N-19, N-36)"
+  ],
+  "security_controls": [
+   "Ownership + flow + deadline inside the write; bank details only to the owner of a flow-2 booking in an owed state",
+   "No receipt URLs; pending bank revisions never exposed",
+   "TM-03, TM-16, TM-18, B1",
+   "SB-2, SB-3, SB-5, SB-13, SB-15"
+  ]
+ },
+ {
+  "id": "W2-14",
+  "title": "WhatsApp message templates, admin to customer (was G2-15 + UX-15, TM-19)",
+  "wave": 2,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-contact/whatsapp-templates.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-11"
+  ],
+  "acceptance": [
+   "Closed template ids (request_received, approved_online, approved_legacy, hold_reminder, terms_reminder, deposit_recorded, event_details_request, event_reminder, production_update, album_ready, handover_confirmation, handover_day, feedback_request, offline_selection); approved_online states the deadline in Riyadh time",
+   "Arabic, feminine, studio voice, aligned with 08-copy-ar.md and reviewed by the copy reviewer; messages under the length cap"
+  ],
+  "security_controls": [
+   "Templates never include bank details or any link other than the site origin",
+   "Pure functions; no PII beyond what the message needs",
+   "SB-6, SB-13"
+  ]
+ },
+ {
+  "id": "W2-15",
+  "title": "Profile hardening: verified-email ownership, recent sign-in for contact changes (new: C-2, C-4, TM-08, TM-12, SEC-14)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/profile.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-02",
+   "W1-10",
+   "W1-15"
+  ],
+  "acceptance": [
+   "users.email written only from a verified token (email_verified_at stamped); an unverified conflicting row without bookings can be reclaimed by the verified owner; unverified registration still works (SEC-04 reproduction closed)",
+   "Erased user -> 410 (SEC-14); phone/email change on an existing row needs CO+R and stamps contact_changed_at (TM-08); names through the validator, URLs refused; RL_PROFILE burst"
+  ],
+  "security_controls": [
+   "C-2, C-4, TM-08, TM-12",
+   "No email or phone in logs",
+   "SB-1, SB-3, SB-15, SB-16, SB-18"
+  ]
+ },
+ {
+  "id": "W2-16",
+  "title": "Journey facts v2 and /me additions: deposit_reported, stage times, studio number changes (was G2-2 + UX-02, UX-14, TM-03, TM-19)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "shared/journey.ts",
+   "worker/portal/journey-loader.ts",
+   "worker/bookings.ts",
+   "src/api/bookings.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-06"
+  ],
+  "acceptance": [
+   "JourneyFacts gains termsAcceptedAt, noticeForCurrentDeadline, stageUpdatedAt; sub-states awaiting_deposit and deposit_reported; loadJourneyRecordsByBookingIds(env, ids <= 100) for admin use",
+   "/me adds termsAcceptedAt, stageUpdatedAt and studio {whatsappNumber, whatsappNumberChangedAt} from the effective contact revision; client parser accepts old and new shapes; legacy rows unchanged"
+  ],
+  "security_controls": [
+   "/me still filtered by uid; loader by ids is admin-only",
+   "Bound IN (?…) list built from a count",
+   "UX-02, UX-14",
+   "SB-2, SB-4"
+  ]
+ },
+ {
+  "id": "W2-17",
+  "title": "Worker entry hardening: preview read-only, CSP report route, cached availability (new: C-8, C-10, TM-11, TM-17)",
+  "wave": 2,
+  "role": "backend",
+  "files": [
+   "worker/index.ts",
+   "worker/csp-report.ts"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-01",
+   "W1-03",
+   "W1-15"
+  ],
+  "acceptance": [
+   "PREVIEW_READ_ONLY=\"on\" -> every non-GET /api/* except /api/csp-report answers 403 PREVIEW_READ_ONLY, and preview responses carry X-Robots-Tag noindex",
+   "/api/availability served with a 60 s edge cache (no personal data in the key) and an IP burst limit",
+   "POST /api/csp-report: reports+json and csp-report, <= 8 KiB, burst-limited, stores only day + directive + blocked origin counts (<= 200 rows/day), 204"
+  ],
+  "security_controls": [
+   "No URL or report body stored",
+   "Bounded body; no auth required but limited",
+   "C-8, C-10, TM-11, TM-17",
+   "SB-3, SB-7, SB-15"
+  ]
+ },
+ {
+  "id": "W2-18",
+  "title": "Security headers, CSP reporting and Firebase config guard (was G1-10 + H1, C-9, C-10, TM-14)",
+  "wave": 2,
+  "role": "fullstack",
+  "files": [
+   "vite.config.ts",
+   "public/_headers",
+   "scripts/config-guard.mjs"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-16"
+  ],
+  "acceptance": [
+   "config-guard.mjs pure checks shared with the release preflight: VITE_FIREBASE_PROJECT_ID equals the FIREBASE_PROJECT_ID of the CLOUDFLARE_ENV being built; auth domain is <projectId>.firebaseapp.com and appears in frame-src; the inline-script hash of index.html is in _headers (N-53)",
+   "_headers: COOP same-origin on the SPA, img-src self blob:, Reporting-Endpoints + report-to + report-uri /api/csp-report, a separate Report-Only require-trusted-types-for 'script'; still Report-Only",
+   "A build-time CSP_MODE=enforce option (not exposed to the client) emits the enforced header for preview trials; env files per mode documented (.env.development.local, .env.preview.local, .env.production.local)"
+  ],
+  "security_controls": [
+   "Hostnames validated before use; no env values printed",
+   "H1, C-9, C-10, TM-14",
+   "SB-6, SB-8, SB-19"
+  ]
+ },
+ {
+  "id": "W2-19",
+  "title": "MOT-02 Design build and dev scripts (deploy moved to W3-19)",
+  "wave": 2,
+  "role": "frontend",
+  "files": [
+   "package.json",
+   "scripts/build-design.mjs",
+   "src/styles/README.md"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-16"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-02 as amended: build/dev only (no --deploy, no --allow-dirty); marker check; strict argument allowlist; CLOUDFLARE_ENV set or removed explicitly"
+  ],
+  "security_controls": [
+   "shell false with argument arrays",
+   "No secrets read or printed",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W2-20",
+  "title": "MOT-04 Cinematic tokens, hero entrance, scroll reveals, wipes, parallax (+UX-09 entry guard, UX-10, UX-12)",
+  "wave": 2,
+  "role": "motion",
+  "files": [
+   "src/design/cinematic/boot.ts",
+   "src/design/cinematic/tokens.css",
+   "src/design/cinematic/hero.css",
+   "src/design/cinematic/scroll.css"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-16"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-04 as amended: VT timings shortened, corners in --cine-gold with an ink hairline, photo wipes only through the reveal contract (a filter change adds no motion), E2/E7 suppressed under data-cine-entry"
+  ],
+  "security_controls": [
+   "Every selector prefixed :root[data-design=\"cinematic\"]; no hex; no url()",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W2-21",
+  "title": "MOT-06 Motion audit and classic-parity tool (+M7, TM-22, UX-01 metrics)",
+  "wave": 2,
+  "role": "frontend",
+  "files": [
+   "scripts/motion-audit.mjs"
+  ],
+  "depends_on": [
+   "W1-RV",
+   "W1-16"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-06 as amended: parity hard gate = DOM + emitted-CSS hashes; screenshots after fonts.ready and decode with <= 0.1% tolerance; Firebase config stubbed; npm ci in the worktree; reports logo-not-ready rate and hero readiness time"
+  ],
+  "security_controls": [
+   "Chrome --remote-debugging-port=0 on 127.0.0.1 with a temp profile, killed on exit; never prints VITE_* values; Fetch interception keeps traffic on 127.0.0.1",
+   "TM-22",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W2-RV",
+  "title": "Wave-2 adversarial review (was RV-2)",
+  "wave": 2,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w2-review.md"
+  ],
+  "depends_on": [
+   "W2-01",
+   "W2-02",
+   "W2-03",
+   "W2-04",
+   "W2-05",
+   "W2-06",
+   "W2-07",
+   "W2-08",
+   "W2-09",
+   "W2-10",
+   "W2-11",
+   "W2-12",
+   "W2-13",
+   "W2-14",
+   "W2-15",
+   "W2-16",
+   "W2-17",
+   "W2-18",
+   "W2-19",
+   "W2-20",
+   "W2-21"
+  ],
+  "acceptance": [
+   "Two reviewers per unit; runs N-01…N-11, N-15…N-19, N-22, N-26, N-29, N-30, N-30b, N-33, N-34, N-36, N-39, N-40, N-41, N-42, N-45, N-50, N-52, N-53 with curl against local",
+   "Verifies C-2 (profile), C-8, C-9, C-10 (report route), C-17 against SEC acceptance; 12 A1-A6 for motion units"
+  ],
+  "security_controls": [
+   "Read-only; local only; no production tokens"
+  ]
+ },
+ {
+  "id": "W3-01",
+  "title": "Customer handover API with active-area and re-book rules (was G3-1 + TM-06, TM-08, TM-15)",
+  "wave": 3,
+  "role": "backend",
+  "files": [
+   "worker/portal/handover.ts",
+   "worker/portal/slots/handover.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-02",
+   "W1-06",
+   "W1-10",
+   "W1-15",
+   "W2-08"
+  ],
+  "acceptance": [
+   "#9-#11 on OwnedBooking; delivery booking needs CO+R; delivery_areas.is_active = 1 inside the INSERT; re-book after no_show/cancelled excludes its own row",
+   "Concurrency test N-18 (two customers, last slot -> exactly one success); N-36"
+  ],
+  "security_controls": [
+   "The §2.3-verified conditional insert; address treated as PII; full slots hidden",
+   "TM-06, TM-08, TM-15",
+   "SB-2, SB-5, SB-13, SB-16"
+  ]
+ },
+ {
+  "id": "W3-02",
+  "title": "Admin search by POST, detail enrichment and blocked-date audit (was G3-2 + TM-17, TM-08)",
+  "wave": 3,
+  "role": "fullstack",
+  "files": [
+   "worker/admin.ts",
+   "shared/admin.ts",
+   "src/api/admin.ts",
+   "worker/portal/admin-search.ts",
+   "worker/portal/slots/admin-search.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-09",
+   "W2-01",
+   "W2-02",
+   "W2-16"
+  ],
+  "acceptance": [
+   "5 files justified: the POST search reuses the list builder and the same summary type",
+   "#16 (customerId + stage fields, no q), #17 enrichment (noticeProtected, customerContactChangedSinceBooking, consent), #41/#42 POST search; blocked-date create/delete write admin_audit_log in the same batch",
+   "Client parsers extended; pagination with a query stable; the query text never appears in a URL"
+  ],
+  "security_controls": [
+   "LIKE escaped with ESCAPE '\\'; q validated and digit-normalised; stage loading bounded to the page",
+   "RL_ADMIN_READ",
+   "TM-17",
+   "SB-4, SB-10, SB-15"
+  ]
+ },
+ {
+  "id": "W3-03",
+  "title": "Event and handover reminder jobs (was G3-4 + TM-15)",
+  "wave": 3,
+  "role": "backend",
+  "files": [
+   "worker/jobs/event-reminders.ts",
+   "worker/jobs/handover-reminders.ts",
+   "worker/emails/journey.ts",
+   "worker/jobs/registry.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-06",
+   "W2-08"
+  ],
+  "acceptance": [
+   "-7 d/-1 d event reminders while confirmed, -1 d handover reminder, send window 09-21 Riyadh, anchors per ADR §2.2; skipped without EM; heartbeat rows; bounded per tick",
+   "Random claim tokens; eligibility re-checked or the row superseded before sending (N-46)"
+  ],
+  "security_controls": [
+   "Outbox dedupe keys without PII; escaped templates",
+   "TM-15",
+   "SB-6, SB-7, SB-13"
+  ]
+ },
+ {
+  "id": "W3-04",
+  "title": "Admin settings tab with pending-change banner and kill switch (was G3-5 + TM-03, TM-04, H3, UX-07, UX-16)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-settings/AdminSettingsTab.tsx",
+   "src/features/admin-settings/settings-api.ts",
+   "src/features/admin-settings/BankAccountForm.tsx",
+   "src/features/admin-settings/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-05",
+   "W1-07",
+   "W1-08",
+   "W1-10",
+   "W2-01",
+   "W2-05"
+  ],
+  "acceptance": [
+   "Tab «الإعدادات»: feature status (why online confirmation is not offered), deposit rule with a live example, bank form (grouped IBAN, checksum hint, re-auth before submit), WhatsApp number, pickup",
+   "Pending-change banner with the effective time and «إلغاء التغيير» (re-saves the effective values); 72 h change banner; kill-switch card (off with a confirmation, on with re-auth)",
+   "Digits normalised on input; inputmode and dir=\"ltr\" on IBAN and phone; content-rule errors shown inline; keyboard, RTL, visible focus, loading/empty/error states"
+  ],
+  "security_controls": [
+   "IBAN typed by the admin only; masked in lists except while editing; autocomplete off on bank fields; no drafts in storage",
+   "TM-03, TM-04, H3, UX-07",
+   "SB-12, SB-14"
+  ]
+ },
+ {
+  "id": "W3-05",
+  "title": "Admin work queue tab: one-tap WhatsApp, sent/dismiss, live count (was G3-6 + UX-03, UX-04, UX-05, UX-06)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-queue/AdminQueueTab.tsx",
+   "src/features/admin-queue/queue-api.ts",
+   "src/features/admin-queue/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-11",
+   "W2-05",
+   "W2-10",
+   "W2-14"
+  ],
+  "acceptance": [
+   "«اليوم» summary, sections in server order, empty sections hidden, due times server-time corrected",
+   "Each item renders a real <a href=\"https://wa.me/…\" target=\"_blank\" rel=\"noopener noreferrer\"> from its own data: 1 tap from /admin to a prefilled chat at 375 x 812 (UX-03); «فُتح واتساب قبل {n}» with «تم الإرسال» and «تجاهل» (UX-06)",
+   "Pending count in document.title; refetch on visibilitychange and focus; «آخر تحديث» (UX-04); empty state «لا يوجد ما يحتاج متابعة اليوم»"
+  ],
+  "security_controls": [
+   "Links only through the W1-11 builder; phone digits never rendered as text",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W3-06",
+  "title": "Admin calendar tab with an agenda list on phones (was G3-7 + UX-13)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-calendar/AdminCalendarTab.tsx",
+   "src/features/admin-calendar/calendar-api.ts",
+   "src/features/admin-calendar/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-11"
+  ],
+  "acceptance": [
+   "Month grid (Riyadh dates) on wide screens and an agenda/week list by default below 48rem; blocked days; bookings with status icon + text; RTL arrow mapping as in BookingCalendar; month switching aborts stale requests"
+  ],
+  "security_controls": [
+   "Text rendering only; aborts on unmount",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W3-07",
+  "title": "Admin contact section with safe links and change labels (was G3-8 + TM-12, TM-08, UX-06)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-contact/AdminContactSection.tsx",
+   "src/features/admin-contact/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-02",
+   "W2-05",
+   "W2-14"
+  ],
+  "acceptance": [
+   "Customer name/phone/email wrapped in <bdi>, copy buttons, templates relevant to the stage first, last contact per template with outcome; «تغيّر رقم الجوال بعد إنشاء الحجز» label",
+   "mailto:/tel: built only with fixed schemes and encodeURIComponent; no href from free text"
+  ],
+  "security_controls": [
+   "Clipboard writes only on click",
+   "TM-12, TM-08",
+   "SB-6, SB-12"
+  ]
+ },
+ {
+  "id": "W3-08",
+  "title": "Admin timeline section (was G3-9)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-timeline/AdminTimelineSection.tsx",
+   "src/features/admin-timeline/timeline-api.ts",
+   "src/features/admin-timeline/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-05"
+  ],
+  "acceptance": [
+   "Merged timeline with Arabic labels per event kind (incl. hold_reinstated, terms_accepted_offline, admin_whatsapp_sent), actor, Riyadh time, email status; loads on demand"
+  ],
+  "security_controls": [
+   "Details rendered through a whitelist of known keys, never raw JSON as HTML",
+   "SB-6"
+  ]
+ },
+ {
+  "id": "W3-09",
+  "title": "Admin customers tab with POST search (was G3-10 + TM-17)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-customers/AdminCustomersTab.tsx",
+   "src/features/admin-customers/customers-api.ts",
+   "src/features/admin-customers/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-11",
+   "W2-14",
+   "W3-02"
+  ],
+  "acceptance": [
+   "Search through POST #42 (in memory, debounced, aborts), list with booking counts, customer detail with bookings, WhatsApp button"
+  ],
+  "security_controls": [
+   "Search text never in a URL; results limited; text rendering in <bdi>",
+   "TM-17",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W3-10",
+  "title": "Admin handover section and slots tab (was G3-11 + UX-13)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-handover/AdminHandoverSection.tsx",
+   "src/features/admin-handover/AdminSlotsTab.tsx",
+   "src/features/admin-handover/handover-admin-api.ts",
+   "src/features/admin-handover/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-08"
+  ],
+  "acceptance": [
+   "Slot list by date with fill rate, create/generate/deactivate/delete with confirmations and the in-statement refusals surfaced; booking section with method, slot, address (delivery), complete/no-show/cancel/reassign; 44 px targets"
+  ],
+  "security_controls": [
+   "Destructive actions confirmed with the safe button focused; address shown only in the booking section",
+   "SB-12, SB-13"
+  ]
+ },
+ {
+  "id": "W3-11",
+  "title": "Admin production and event-profile sections (was G3-12 + TM-08)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-production/AdminProductionSection.tsx",
+   "src/features/admin-production/registration.ts",
+   "src/features/admin-event-profile/AdminEventProfileSection.tsx",
+   "src/features/admin-event-profile/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-06",
+   "W2-07"
+  ],
+  "acceptance": [
+   "Stage control (design/printing/ready) visible only after the event; profile and consent history; «الموافقة على النشر: لا» by default; a granted consent shows «موافقة على النشر من العروس، لم يؤكدها الاستوديو بعد» (text + icon)"
+  ],
+  "security_controls": [
+   "Consent read-only to the admin; text rendering in <bdi>",
+   "TM-08",
+   "SB-6, SB-13"
+  ]
+ },
+ {
+  "id": "W3-12",
+  "title": "Admin feedback section and audit log tab (was G3-13)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-feedback/AdminFeedbackSection.tsx",
+   "src/features/admin-feedback/registration.ts",
+   "src/features/admin-audit/AdminAuditTab.tsx",
+   "src/features/admin-audit/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-05",
+   "W2-09"
+  ],
+  "acceptance": [
+   "Read-only feedback; audit list with Arabic action labels (incl. admin_promoted, admin_sessions_revoked, online_confirmation_switched), re-auth marker, pagination"
+  ],
+  "security_controls": [
+   "No edit/delete affordances; text rendering",
+   "SB-6, SB-10"
+  ]
+ },
+ {
+  "id": "W3-13",
+  "title": "Customer event-details view and .ics, consent re-auth, privacy link (was G3-14 + TM-08, H4, UX-07)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/event-profile/EventDetailsStageView.tsx",
+   "src/features/event-profile/event-profile-api.ts",
+   "src/features/event-profile/ics.ts",
+   "src/features/event-profile/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-08",
+   "W2-06",
+   "W3-16"
+  ],
+  "acceptance": [
+   "Form with limits and Arabic validation; consent toggle default «لا»; granting opens the re-auth dialog when the sign-in is older than 10 minutes; withdrawal note",
+   "Link to /privacy at the point of collection (H4); digits normalised; countdown; .ics (all-day, CRLF, escaped text, no PII beyond the event title) through a revoked Blob URL"
+  ],
+  "security_controls": [
+   ".ics escaping; no venue text in the file name; object URL revoked",
+   "TM-08, H4",
+   "SB-6, SB-12, SB-13"
+  ]
+ },
+ {
+  "id": "W3-14",
+  "title": "Customer feedback view (was G3-15)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/features/feedback/FeedbackStageView.tsx",
+   "src/features/feedback/feedback-api.ts",
+   "src/features/feedback/registration.ts"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-09"
+  ],
+  "acceptance": [
+   "Rating as a radio group with text labels, optional comment, thank-you state, «لن يُنشر رأيكِ دون إذنكِ»; 44 px targets"
+  ],
+  "security_controls": [
+   "Text rendering; single submission",
+   "SB-6"
+  ]
+ },
+ {
+  "id": "W3-15",
+  "title": "Booking-request hardening: open-request cap, horizon, limits, email re-sync (new: C-3, C-4, C-2)",
+  "wave": 3,
+  "role": "fullstack",
+  "files": [
+   "worker/bookings.ts",
+   "src/components/BookingCalendar.tsx"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-10",
+   "W1-15",
+   "W2-15"
+  ],
+  "acceptance": [
+   "POST /api/bookings: <= 3 open requests and <= 5 per hour inside the INSERT (409 OPEN_REQUEST_LIMIT / 429), event date between Riyadh today and today + 730 days (400 DATE_BEYOND_HORIZON), RL_BOOKING burst; SEC-03 reproduction closed",
+   "Stored email re-synced from the verified token (C-2); BookingCalendar max date = horizon; legacy success path identical (N-29)"
+  ],
+  "security_controls": [
+   "C-3, C-4, C-2",
+   "Caps atomic inside the statement",
+   "SB-5, SB-15"
+  ]
+ },
+ {
+  "id": "W3-16",
+  "title": "Privacy notice and e-commerce disclosure routes (new: H4, C-11, SEC-15)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "src/pages/LegalPage.tsx",
+   "src/data/legal-texts.ts",
+   "src/layout/navigation.ts",
+   "src/layout/route-meta.ts",
+   "src/layout/lazy-components.ts",
+   "src/App.tsx"
+  ],
+  "depends_on": [
+   "W2-RV"
+  ],
+  "acceptance": [
+   "6 files justified: the custom router needs the path type, meta, lazy registration and the switch case atomically; no React Router",
+   "/privacy and /disclosure render owner- and lawyer-supplied plain text from legal-texts.ts; nothing is invented; a missing text is an explicit placeholder that the release preflight refuses (H4 precondition)",
+   "Classic and cinematic parity for every existing route unchanged"
+  ],
+  "security_controls": [
+   "Text rendered as React text; no HTML or markdown",
+   "H4, C-11",
+   "SB-6, SB-13"
+  ]
+ },
+ {
+  "id": "W3-17",
+  "title": "MOT-07 Display headings (Arabic-safe words) and hero H1 (+UX-17, entry guard)",
+  "wave": 3,
+  "role": "motion",
+  "files": [
+   "src/design/cinematic/DisplayHeading.tsx",
+   "src/design/cinematic/words.css",
+   "src/design/classic/DisplayHeading.tsx",
+   "src/pages/home/HeroSection.tsx"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-20"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-07 as amended: TalkBack/Chrome Android and VoiceOver iOS (one stop per heading); resting line breaks with motion on = classic at 320/375/768; E5 suppressed under data-cine-entry"
+  ],
+  "security_controls": [
+   "String prop rendered as React text; --wi from a clamped integer",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W3-18",
+  "title": "MOT-08 Gold khatam ornament and story mark",
+  "wave": 3,
+  "role": "motion",
+  "files": [
+   "src/design/cinematic/Khatam.tsx",
+   "src/design/cinematic/khatam.css",
+   "src/design/classic/Khatam.tsx",
+   "src/pages/home/StorySection.tsx"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W2-20"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-08: geometry per §5.1, draws counter-clockwise from the top, reduced motion fully drawn, decorative"
+  ],
+  "security_controls": [
+   "Static path data only",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W3-19",
+  "title": "Release tooling: one deploy path with preflight, tag rule and launch floor (new: TM-05, H6, B3, TM-21, L3, H1, H4)",
+  "wave": 3,
+  "role": "fullstack",
+  "files": [
+   "scripts/release-preflight.mjs",
+   "scripts/release.mjs",
+   "package.json"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-03",
+   "W2-18",
+   "W2-19"
+  ],
+  "acceptance": [
+   "release-preflight.mjs asserts from the generated wrangler.json and dist: account_id and name; real production D1 id; no r2_buckets; preview_urls false; ONLINE_CONFIRMATION expected; no PDPL_SIGNOFF_REF/MEDIA_SIGNING_KEY in vars; ADMIN_MEDIA_MFA \"required\"; Firebase ids and auth domain (config-guard); _headers hash; design markers; legal texts present; no data:image and no secret patterns (N-35)",
+   "release.mjs --env=production|preview --design=classic|cinematic [--rollback <version>]: clean tree; production only from an annotated release-* tag that passed the gate; design pinned; right Vite mode; preflight; prints target, design and commit and asks for a typed go-ahead; wrangler deploy --tag --message; appends to the release log (N-54)",
+   "--rollback refuses versions below the recorded launch floor (N-62); package.json deploy:* scripts all route to release.mjs; --allow-dirty does not exist"
+  ],
+  "security_controls": [
+   "shell false with argument arrays; never prints env values",
+   "TM-05, H6, B3, TM-21, L3",
+   "SB-8, SB-19"
+  ]
+ },
+ {
+  "id": "W3-20",
+  "title": "Booking request form: quantity ceilings and WhatsApp after submit (new: C-12, UX-04)",
+  "wave": 3,
+  "role": "frontend",
+  "files": [
+   "shared/booking.ts",
+   "src/data/packages.ts",
+   "src/components/PackageConfigurator.tsx",
+   "src/components/PackageConfigurator.css"
+  ],
+  "depends_on": [
+   "W2-RV",
+   "W1-11"
+  ],
+  "acceptance": [
+   "Per-item maximum quantities enforced by the shared validator (server and client); prices unchanged (SEC-09)",
+   "Success state shows a real <a> «أرسلي رقم طلبكِ للاستوديو عبر واتساب» with the reference prefilled and «سنراجع طلبكِ ونتواصل معكِ عبر واتساب»; no response time unless the owner provides one"
+  ],
+  "security_controls": [
+   "Link through the W1-11 builder with the compiled public number",
+   "C-12, UX-04",
+   "SB-3, SB-12"
+  ]
+ },
+ {
+  "id": "W3-RV",
+  "title": "Wave-3 adversarial review (was RV-3)",
+  "wave": 3,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w3-review.md"
+  ],
+  "depends_on": [
+   "W3-01",
+   "W3-02",
+   "W3-03",
+   "W3-04",
+   "W3-05",
+   "W3-06",
+   "W3-07",
+   "W3-08",
+   "W3-09",
+   "W3-10",
+   "W3-11",
+   "W3-12",
+   "W3-13",
+   "W3-14",
+   "W3-15",
+   "W3-16",
+   "W3-17",
+   "W3-18",
+   "W3-19",
+   "W3-20"
+  ],
+  "acceptance": [
+   "Two reviewers per unit; UI XSS sweep (N-20), N-08, N-09, N-18, N-21, N-35, N-46, N-54, N-55, N-57, N-62, accessibility spot checks (44 px, contrast, keyboard)",
+   "Verifies C-3, C-4, C-11 against SEC acceptance"
+  ],
+  "security_controls": [
+   "Read-only; local only"
+  ]
+ },
+ {
+  "id": "W4-01",
+  "title": "Customer confirmation view: terms inline, safe IBAN copy, changed-bank and number notices (was G4-1 + TM-16, UX-08, UX-15, TM-03, TM-18, UX-02)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/features/confirmation/ConfirmationStageView.tsx",
+   "src/features/confirmation/confirmation-api.ts",
+   "src/features/confirmation/DepositInstructions.tsx",
+   "src/features/confirmation/registration.ts"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W1-11",
+   "W2-13",
+   "W2-16"
+  ],
+  "acceptance": [
+   "Step 1 terms rendered inline (or in a disclosure) without scroll-to-end, the whole checkbox row is the >= 44 px label, version shown; the accepted version stays viewable read-only",
+   "Step 2 amount + bank details: IBAN grouped inside <bdi dir=\"ltr\">, copy buttons copy the raw 24-character IBAN and digit-only amount and announce «تم النسخ»; «آخر تحديث لبيانات الحساب»; changed-bank warning with a WhatsApp link; 72 h number-changed notice quoting the compiled number",
+   "Step 3: «بعد التحويل، أرفقي صورة الإيصال في محادثة واتساب», button «أرسلي صورة الإيصال عبر واتساب» (prefilled with reference, amount and «أرسلتُ إيصال العربون»), notice via keepalive; then «أبلغتِنا بالتحويل، وسنؤكد استلام العربون ونبلغكِ»; countdown with server offset; expired and TERMS_VERSION_MISMATCH states"
+  ],
+  "security_controls": [
+   "Bank details and terms rendered as plain text, no autolink; nothing stored locally",
+   "N-56 (paste yields exactly 24 characters)",
+   "TM-16, UX-08, TM-03",
+   "SB-6, SB-12"
+  ]
+ },
+ {
+  "id": "W4-02",
+  "title": "Customer handover view with delivery re-auth and privacy link (was G4-2 + TM-08, H4, UX-13)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/features/handover/HandoverStageView.tsx",
+   "src/features/handover/SlotPicker.tsx",
+   "src/features/handover/handover-api.ts",
+   "src/features/handover/registration.ts"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W1-08",
+   "W3-01"
+  ],
+  "acceptance": [
+   "Pickup vs delivery (area + fee, address fields with digit normalisation), slot picker (keyboard, grouped by day, Riyadh times, 44 px targets), SLOT_UNAVAILABLE recovery, WhatsApp final step on handover day",
+   "Booking a delivery opens the re-auth dialog when the sign-in is older than 10 minutes; link to /privacy next to the address fields; pickup text rendered plain without autolink"
+  ],
+  "security_controls": [
+   "Address never echoed into URLs or logs; validation mirrors the server",
+   "TM-08, H4",
+   "SB-12, SB-13"
+  ]
+ },
+ {
+  "id": "W4-03",
+  "title": "Admin bookings: POST search, export, queue landing, four-destination mobile layout, idle sign-out (was G4-3 + UX-05, TM-07, TM-13, TM-17)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/components/AdminDashboard.tsx",
+   "src/components/AdminDashboard.css",
+   "src/features/admin-export/ExportBookingsDialog.tsx",
+   "src/features/admin-portal/admin-location.ts"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W1-08",
+   "W2-12",
+   "W3-02",
+   "W3-05"
+  ],
+  "acceptance": [
+   "Search box through POST #41 combined with filters (in memory), result count; export dialog (date range, status, re-auth, PII warning «يحتوي الملف على بيانات شخصية. احذفيه بعد الاستخدام», Blob download, revoke)",
+   "Below 48rem at most four primary destinations «اليوم»، «الحجوزات»، «التقويم»، «المزيد»; booking detail on phones has a sticky summary (first name, event date, stage, deadline) with the primary action and WhatsApp first; default landing = queue; existing deep links still work",
+   "Mounts startIdleSignOut(30) for the admin shell; REAUTH_REQUIRED after 12 h opens the re-auth dialog"
+  ],
+  "security_controls": [
+   "Query text never written to the address bar or an API URL; export only via requestBlob; object URL revoked",
+   "TM-07, TM-13, TM-17, UX-05",
+   "SB-12, SB-14, SB-18"
+  ]
+ },
+ {
+  "id": "W4-04",
+  "title": "Admin deposit and terms section (was G4-4 + TM-20)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-deposit/AdminDepositSection.tsx",
+   "src/features/admin-deposit/registration.ts"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W3-02"
+  ],
+  "acceptance": [
+   "Expected vs received amount, terms version/time (incl. offline), bank revision vs effective (warning), notices with the hold-protected marker, next-action hint; states that notices, receipts and hash matches are not proof of payment"
+  ],
+  "security_controls": [
+   "Read-only; text rendering",
+   "TM-20",
+   "SB-6"
+  ]
+ },
+ {
+  "id": "W4-05",
+  "title": "Customer hub integration: deposit_reported, last updated, one next step per stage (was G4-5 + UX-14, UX-02, UX-15, TM-03, TM-19)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/components/MyBookings.tsx",
+   "src/features/journey/hub-model.ts",
+   "src/components/MyBookings.css"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W1-11",
+   "W2-16"
+  ],
+  "acceptance": [
+   "Studio number from /me (fallback constant) with the 72 h number-changed notice; awaiting_deposit and deposit_reported copy; pending_review «سنراجع طلبكِ ونتواصل معكِ عبر واتساب»",
+   "Gated-mode awaiting_previews «سنرسل لكِ الصور عبر واتساب لتختاري منها» with a WhatsApp link; «آخر تحديث: {date}» on production stages; every stage card has exactly one primary action or an explicit \"nothing needed until {date}\" line; next step and deadline above the fold at 375 px"
+  ],
+  "security_controls": [
+   "No new storage; links via W1-11",
+   "UX-02, UX-14, TM-19",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W4-06",
+  "title": "Admin settings: terms editor, delivery areas, history with pending changes (was G4-6 + TM-04, TM-18, TM-03)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-settings/TermsEditor.tsx",
+   "src/features/admin-settings/DeliveryAreasEditor.tsx",
+   "src/features/admin-settings/SettingsHistory.tsx",
+   "src/features/admin-settings/AdminSettingsTab.tsx"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W3-04"
+  ],
+  "acceptance": [
+   "Plain-text editor with the compliance topic checklist from 02-compliance.md (topics only, no invented legal text), diff against the current version, publish with re-auth + optimistic concurrency; content-rule errors inline",
+   "Areas CRUD (no delete); history per section with effective time and pending marker"
+  ],
+  "security_controls": [
+   "Terms rendered as text; RA/AD+S; no local drafts of terms or bank data",
+   "TM-04, TM-18",
+   "SB-6, SB-14"
+  ]
+ },
+ {
+  "id": "W4-07",
+  "title": "Feedback request job (was G4-9 + TM-15)",
+  "wave": 4,
+  "role": "backend",
+  "files": [
+   "worker/jobs/feedback-request.ts",
+   "worker/jobs/registry.ts",
+   "worker/emails/journey.ts"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W2-09",
+   "W3-03"
+  ],
+  "acceptance": [
+   "+2 d after completion, once, only if no feedback and no feedback_request sent; skipped without EM; random claim tokens; eligibility re-check before send"
+  ],
+  "security_controls": [
+   "Dedupe; escaped copy",
+   "TM-15",
+   "SB-6"
+  ]
+ },
+ {
+  "id": "W4-08",
+  "title": "Privacy links at every point of collection: auth dialog and footer (new: H4, C-11)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/components/AuthDialog.tsx",
+   "src/layout/SiteFooter.tsx"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W3-16"
+  ],
+  "acceptance": [
+   "Registration form links /privacy before collecting the name and phone; footer links /privacy and /disclosure; classic parity report attributes the footer difference to this unit"
+  ],
+  "security_controls": [
+   "No new listener; existing AuthDialog only",
+   "H4, C-11",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W4-09",
+  "title": "MOT-09 SPA page transitions (+UX-09, M5)",
+  "wave": 4,
+  "role": "motion",
+  "files": [
+   "src/App.tsx",
+   "src/design/cinematic/page-transition.ts",
+   "src/design/cinematic/transitions.css",
+   "src/design/classic/page-transition.ts"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W1-18",
+   "W2-20",
+   "W3-16"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-09 as amended: 450 ms veil, ::view-transition pointer-events none, pending feedback, mobile menu closes instantly, data-cine-entry=\"vt\" suppresses E5/E7, router renders loadedModule() so the snapshot contains the destination H1 (M5)"
+  ],
+  "security_controls": [
+   "Primitives computed synchronously; every VT promise handled; /admin excluded",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W4-10",
+  "title": "MOT-12 Display headings and ornament on the remaining surfaces (+UX-12)",
+  "wave": 4,
+  "role": "frontend",
+  "files": [
+   "src/pages/home/StorySection.tsx",
+   "src/pages/sections/ContactSection.tsx",
+   "src/pages/PortfolioPage.tsx",
+   "src/pages/PackagesPage.tsx"
+  ],
+  "depends_on": [
+   "W3-RV",
+   "W3-17",
+   "W3-18"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-12 as amended: classic DOM identical; packages H1 >= 4.5:1 at rest against the lightest banner pixel under the scrim"
+  ],
+  "security_controls": [
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W4-RV",
+  "title": "Wave-4 adversarial review (was RV-4)",
+  "wave": 4,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w4-review.md"
+  ],
+  "depends_on": [
+   "W4-01",
+   "W4-02",
+   "W4-03",
+   "W4-04",
+   "W4-05",
+   "W4-06",
+   "W4-07",
+   "W4-08",
+   "W4-09",
+   "W4-10"
+  ],
+  "acceptance": [
+   "Two reviewers per unit; full flow-2 walk on the WhatsApp channel incl. the B1 paid-bride scenario; CSV attack table; export audit; N-20 on the new views; N-56; 12 A1-A6"
+  ],
+  "security_controls": [
+   "Read-only; local only"
+  ]
+ },
+ {
+  "id": "W5-01",
+  "title": "Optional TOTP MFA, re-auth with TOTP, account security tab (was G5-6 + M3, C-6, TM-07, TM-03)",
+  "wave": 5,
+  "role": "frontend",
+  "files": [
+   "src/auth/AuthContext.tsx",
+   "src/components/AuthDialog.tsx",
+   "src/features/reauth/ReauthDialog.tsx",
+   "src/features/reauth/use-reauth-retry.ts",
+   "src/features/admin-security/AccountSecurityTab.tsx",
+   "src/features/admin-security/registration.ts"
+  ],
+  "depends_on": [
+   "W4-RV",
+   "W1-02",
+   "W1-08",
+   "W2-05",
+   "W4-08"
+  ],
+  "acceptance": [
+   "6 files justified: the MFA sign-in resolver and re-auth with an enrolled TOTP must land together or re-auth breaks once enrolled (M3)",
+   "Sign-in handles auth/multi-factor-auth-required with a TOTP step; «أمان الحساب» tab to enrol (secret + otpauth URI as text, no QR dependency) and unenrol with re-auth; re-auth with TOTP enrolled works",
+   "«تسجيل الخروج من كل الأجهزة» (AD+R) calls #44; explains setting ADMIN_SETTINGS_2F=required after enrolment; works unchanged without Identity Platform (feature hidden)"
+  ],
+  "security_controls": [
+   "TOTP secret shown once, never stored or logged; enrolment needs fresh re-auth",
+   "One listener, one provider, the existing AuthDialog",
+   "SB-1, SB-12, SB-14, SB-18"
+  ]
+ },
+ {
+  "id": "W5-02",
+  "title": "MOT-10 Logo intro (+UX-01, UX-11, UX-12)",
+  "wave": 5,
+  "role": "motion",
+  "files": [
+   "src/design/cinematic/LogoIntro.tsx",
+   "src/design/cinematic/intro.css",
+   "src/design/classic/LogoIntro.tsx",
+   "src/App.tsx"
+  ],
+  "depends_on": [
+   "W4-RV",
+   "W1-17",
+   "W2-20",
+   "W3-17",
+   "W3-18",
+   "W4-09"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-10 as amended: 60-day repeat rule, <= 1.8 s sequence, single <= 400 ms hero fade after the intro, focusin/click instant finish, 50 ms jank guard, hero H1 + CTA visible by t0 + 2.2 s on 4x CPU + Fast 4G"
+  ],
+  "security_controls": [
+   "Narrow DOMException/TypeError catches; storage value is a non-personal day number",
+   "No new Firebase listener",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W5-03",
+  "title": "MOT-11 Services ticker, only after the owner's written D12 decision (+UX-18, L5)",
+  "wave": 5,
+  "role": "motion",
+  "files": [
+   "src/design/cinematic/ServicesTicker.tsx",
+   "src/design/cinematic/ticker.css",
+   "src/design/classic/ServicesTicker.tsx",
+   "src/pages/HomePage.tsx"
+  ],
+  "depends_on": [
+   "W4-RV",
+   "W2-20",
+   "W3-18"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-11 as amended: without a written \"keep the ticker\" decision the unit ships the static band for everyone; static on coarse pointers; paused while any dialog or the mobile menu is open; toggling accessible name"
+  ],
+  "security_controls": [
+   "Items are compile-time constants",
+   "SC-0"
+  ]
+ },
+ {
+  "id": "W5-04",
+  "title": "Handoff documentation (was G7-2 + TM-20, TM-23, M4, B3, H1, H3, L4)",
+  "wave": 5,
+  "role": "docs",
+  "files": [
+   "README.md",
+   "docs/OPERATIONS.md",
+   "docs/SECURITY.md",
+   "runs/redo-v2/HANDOFF.md"
+  ],
+  "depends_on": [
+   "W4-RV"
+  ],
+  "acceptance": [
+   "README: setup with the dev Firebase project, env files per mode (README:477 reconciled), .dev.vars names, seed, promote by uid, run, env.mediatest, npm test/verify, release.mjs, features/gates table, architecture map",
+   "OPERATIONS: §7 runbook incl. launch floor, revert-to-pre-launch, preview runbook, kill switch (D1 first, env var second, keep_vars caveat), incident order, daily and day-one routine (hourly queue check), \"notices and receipts are not proof\"",
+   "SECURITY: SB list, threat-model summary, gates, re-auth, sessions, audit, MFA how-to, key rotation, what is off, \"D1 triggers do not bind account holders\"; HANDOFF: status per unit, open questions, known issues"
+  ],
+  "security_controls": [
+   "Names of secrets only, never values; no customer data in examples",
+   "SB-8"
+  ]
+ },
+ {
+  "id": "W5-05",
+  "title": "Preview environment migration and hardening (new; owner-executed: M4, TM-24, C-8, TM-14)",
+  "wave": 5,
+  "role": "data",
+  "files": [
+   "runs/redo-v2/release/preview-log.md"
+  ],
+  "depends_on": [
+   "W4-RV",
+   "W1-01",
+   "W1-03",
+   "W2-17",
+   "W3-19"
+  ],
+  "acceptance": [
+   "Counts admins on sundus-yar-preview first (> 1 -> stop and decide), Time Travel bookmark, applies 0007/0008, confirms the dev Firebase project and PREVIEW_READ_ONLY",
+   "Cloudflare Access policy on the preview host (owner and named reviewers only); deploy through release.mjs --env=preview --design=cinematic, plus an enforced-CSP trial build for W6-02"
+  ],
+  "security_controls": [
+   "Each remote command approved by the owner and logged",
+   "No production data on preview",
+   "SB-19"
+  ]
+ },
+ {
+  "id": "W5-RV",
+  "title": "Wave-5 adversarial review (was RV-5)",
+  "wave": 5,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w5-review.md"
+  ],
+  "depends_on": [
+   "W5-01",
+   "W5-02",
+   "W5-03",
+   "W5-04",
+   "W5-05"
+  ],
+  "acceptance": [
+   "Two reviewers per unit; MFA sign-in and re-auth with TOTP; sign out everywhere; docs checked against the code; 12 A1-A6 for MOT-10/MOT-11"
+  ],
+  "security_controls": [
+   "Read-only"
+  ]
+ },
+ {
+  "id": "W6-01",
+  "title": "Red team A: API, authz, injection, baseline re-run (was G8-1, non-media part)",
+  "wave": 6,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w6-redteam-api.md"
+  ],
+  "depends_on": [
+   "W5-RV"
+  ],
+  "acceptance": [
+   "Full N-catalogue (non-media) against local and preview; two-customer IDOR matrix over every customer route in both gate states; body/size/content-type fuzzing; gate bypass attempts incl. synonym paths; LIKE/numeric edge cases; races (slot capacity, double confirm, concurrent terms publish, extend vs cron)",
+   "Re-runs every baseline go-live attack (SEC-01…SEC-05, SEC-07, SEC-08, SEC-12, SEC-13, SEC-15, SEC-16, SEC-19) and confirms each closed"
+  ],
+  "security_controls": [
+   "Local and preview only; no production tokens"
+  ]
+ },
+ {
+  "id": "W6-02",
+  "title": "Red team B: browser, CSP, data handling (was G8-2)",
+  "wave": 6,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w6-redteam-web.md"
+  ],
+  "depends_on": [
+   "W5-RV"
+  ],
+  "acceptance": [
+   "Stored-XSS sweep of every text field into every view and email; enforced-CSP trial on preview with the cinematic build: 0 violations across intro, view transitions, ticker, khatam, sign-in/up/reset/verify, admin (N-43, TM-14); Google hosts needed or not",
+   "Clickjacking; token/PII in URLs/storage/logs; CSV in four spreadsheet apps; npm audit; bundle secret scan; headers on all SPA routes"
+  ],
+  "security_controls": [
+   "Preview behind Access; no production tokens"
+  ]
+ },
+ {
+  "id": "W6-03",
+  "title": "Red team C: business logic and fraud (was G8-3 + B1, TM-03, H3, UX-02)",
+  "wave": 6,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w6-redteam-fraud.md"
+  ],
+  "depends_on": [
+   "W5-RV"
+  ],
+  "acceptance": [
+   "IBAN and WhatsApp swap end to end under the 24 h delay and with 2F; payment instructions planted in pickup/area/terms text; kill-switch drill using the D1 switch; confirm_offline abuse",
+   "Paid bride with the admin offline for 48 h keeps her date (N-30b); hold squatting through fake notices; reinstate races; deposit under/over-recording; single-admin lockout and recovery by uid; audit tamper attempts; approval with incomplete settings"
+  ],
+  "security_controls": [
+   "Local and preview only"
+  ]
+ },
+ {
+  "id": "W6-04",
+  "title": "Runtime QA walk, Train A (was G8-4 + UX-04, UX-05, UX-14)",
+  "wave": 6,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/verification/golive-qa.md"
+  ],
+  "depends_on": [
+   "W5-RV"
+  ],
+  "acceptance": [
+   "§6.5 walk of all 15 stages in the default env, legacy regression, the no-email walk (UX-04), per-stage \"next step and deadline above the fold at 375 px\", admin at 375 x 812 (today's items and the first WhatsApp action visible without scrolling)",
+   "RTL and feminine copy, keyboard, reduced motion, no horizontal scroll at 320/375 px, console clean, chunk sizes vs the 470.79 kB baseline, cron catch-up"
+  ],
+  "security_controls": [
+   "Local and preview only"
+  ]
+ },
+ {
+  "id": "W6-05",
+  "title": "MOT-13 Motion release gate and final motion docs",
+  "wave": 6,
+  "role": "frontend",
+  "files": [
+   "README.md",
+   "src/styles/README.md",
+   "runs/redo-v2/verification/motion-qa.md"
+  ],
+  "depends_on": [
+   "W5-RV"
+  ],
+  "acceptance": [
+   "12 §8.2 MOT-13 as amended: every A-check on the final build across Chrome, Safari/iOS, Firefox, Samsung Internet or 4x throttle; parity against design-classic-v1 with each difference attributed; decides whether the Train A release ships cinematic or classic"
+  ],
+  "security_controls": [
+   "SC-0 grep across src/design/",
+   "Confirms 0 CSP violations with the enforced trial (with W6-02)"
+  ]
+ },
+ {
+  "id": "W7-01",
+  "title": "Production release, Train A (was G9-1; owner-executed)",
+  "wave": 7,
+  "role": "fullstack",
+  "files": [
+   "wrangler.jsonc",
+   "public/_headers",
+   "runs/redo-v2/release/golive-release-log.md"
+  ],
+  "depends_on": [
+   "W0-03",
+   "W5-04",
+   "W5-05",
+   "W6-01",
+   "W6-02",
+   "W6-03",
+   "W6-04",
+   "W6-05"
+  ],
+  "acceptance": [
+   "Release gate A met: zero open critical/high, zero open baseline go-live items, legal texts live, Resend decision recorded, design chosen by W6-05; real production D1 id and Firebase project id committed (no other change)",
+   "Runbook §7: old-D1 decision applied; owner account created and verified in the new Firebase project before the public deploy, uid recorded; first deploy via release.mjs (Report-Only) = launch floor; promotion by uid; settings; smoke incl. real verification and reset links; wrangler tail during the launch window",
+   "CSP enforced by a second release within 7 days after 0 violations (Google hosts pruned if unused); rollback drill between two post-launch versions or on preview; gated routes 503"
+  ],
+  "security_controls": [
+   "Every production write approved by the owner in the log; secrets via wrangler secret put (names only)",
+   "No seed marker in production; post-deploy header check",
+   "SB-8, SB-11, SB-19"
+  ]
+ },
+ {
+  "id": "W8-01",
+  "title": "Media primitives with dimension, trailing-data and metadata rules (was G2-13 + TM-09)",
+  "wave": 8,
+  "role": "backend",
+  "files": [
+   "shared/media.ts",
+   "worker/media/sniff.ts",
+   "worker/media/signing.ts",
+   "worker/media/image-meta.ts"
+  ],
+  "depends_on": [
+   "W5-RV",
+   "W1-03"
+  ],
+  "acceptance": [
+   "Magic-byte sniffing after refusing markup; end marker required with <= 1 KiB trailing bytes; header dimension parsing (PNG IHDR, JPEG SOFn, WebP VP8/VP8L/VP8X) with caps; JPEG APP1-APP15 (keeping APP0/ICC), PNG eXIf/tEXt/iTXt/zTXt, WebP EXIF/XMP stripping; tests of polyglots and truncated headers (N-37)",
+   "HMAC-SHA256 over v1|key|e with crypto.subtle.verify, rotation, lifetimes <= 3,600 s customer / <= 600 s admin, key regex"
+  ],
+  "security_controls": [
+   "Constant-time verification; keys are UUIDs only; no key material logged",
+   "TM-09",
+   "SB-7, SB-11"
+  ]
+ },
+ {
+  "id": "W8-02",
+  "title": "Retention job, off by default, two-phase (was G5-5 + C-19, TM-15)",
+  "wave": 8,
+  "role": "backend",
+  "files": [
+   "shared/retention.ts",
+   "worker/jobs/retention.ts",
+   "worker/jobs/registry.ts"
+  ],
+  "depends_on": [
+   "W5-RV",
+   "W1-06",
+   "W4-07"
+  ],
+  "acceptance": [
+   "Returns immediately unless RP; purges questionnaire text (90 d after the event), delivery address (30 d after completion/no-show/cancel), terminal outbox rows (180 d) and, only with PM, R2 objects per media_objects.expires_at through purge_claim -> delete -> deleted_at",
+   "Never deletes booking_requests, booking_receipts rows, consents or audit (D11); never touches referenced keys or keys younger than 24 h; booking_events notes redacted through the allowed trigger path; C-19 hard deadline documented"
+  ],
+  "security_controls": [
+   "Fail-closed flag; counts-only logs",
+   "TM-15, C-19",
+   "SB-7, SB-13"
+  ]
+ },
+ {
+  "id": "W8-RV",
+  "title": "Wave-8 adversarial review (Train B)",
+  "wave": 8,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w8-review.md"
+  ],
+  "depends_on": [
+   "W8-01",
+   "W8-02"
+  ],
+  "acceptance": [
+   "Two reviewers; sniff/strip tables; retention dry run with RP on locally (counts only)"
+  ],
+  "security_controls": [
+   "Read-only; local only"
+  ]
+ },
+ {
+  "id": "W9-01",
+  "title": "Media serving with revocation and strict headers (was G3-3 + TM-09)",
+  "wave": 9,
+  "role": "backend",
+  "files": [
+   "worker/media/serve.ts",
+   "worker/portal/slots/media.ts"
+  ],
+  "depends_on": [
+   "W8-RV",
+   "W8-01"
+  ],
+  "acceptance": [
+   "#15: MAC verified before any D1/R2 call; deleted_at IS NULL per GET; media headers of §3.3; 304 via onlyIf; tested only under env.mediatest; 503 in the default env (N-38)"
+  ],
+  "security_controls": [
+   "Bucket only through getMediaBucket; no edge caching of private bytes",
+   "TM-09, TM-10",
+   "SB-11"
+  ]
+ },
+ {
+  "id": "W9-02",
+  "title": "Receipt upload API (was G4-7 + TM-09, TM-11, C-18)",
+  "wave": 9,
+  "role": "backend",
+  "files": [
+   "shared/portal/receipt.ts",
+   "worker/portal/receipts.ts",
+   "worker/portal/slots/receipts.ts"
+  ],
+  "depends_on": [
+   "W8-RV",
+   "W8-01",
+   "W2-13"
+  ],
+  "acceptance": [
+   "#5 under env.mediatest: CO+M, sniffed type stored, metadata stripped, SHA-256 stored, R2 object deleted on batch failure; <= 6 per booking per hour and RL_UPLOAD; 503 in the default env"
+  ],
+  "security_controls": [
+   "Content-Length before read; UUID keys; media_objects registered with expiry; one pending receipt (index); ids only in events",
+   "SB-3, SB-5, SB-11, SB-15"
+  ]
+ },
+ {
+  "id": "W9-03",
+  "title": "Gallery admin API (was G4-8 + TM-09)",
+  "wave": 9,
+  "role": "backend",
+  "files": [
+   "shared/portal/gallery.ts",
+   "worker/portal/admin-galleries.ts",
+   "worker/portal/slots/admin-gallery.ts"
+  ],
+  "depends_on": [
+   "W8-RV",
+   "W8-01",
+   "W1-02"
+  ],
+  "acceptance": [
+   "#27 (07 §3.E.1-3.E.7 on the 0005 schema); 2F required; uploads with metadata or > 4,096 px refused; export audited"
+  ],
+  "security_controls": [
+   "1.5 MiB/256 KiB caps; filename never in keys, URLs or logs; <= 1,000 photos",
+   "SB-11, SB-13"
+  ]
+ },
+ {
+  "id": "W9-RV",
+  "title": "Wave-9 adversarial review (Train B)",
+  "wave": 9,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w9-review.md"
+  ],
+  "depends_on": [
+   "W9-01",
+   "W9-02",
+   "W9-03"
+  ],
+  "acceptance": [
+   "Two reviewers; N-23, N-24, N-37, N-38, N-48 under env.mediatest"
+  ],
+  "security_controls": [
+   "Read-only; local only"
+  ]
+ },
+ {
+  "id": "W10-01",
+  "title": "Admin receipts API (was G5-1 + TM-09, TM-20)",
+  "wave": 10,
+  "role": "backend",
+  "files": [
+   "worker/portal/admin-receipts.ts",
+   "worker/portal/slots/admin-receipts.ts"
+  ],
+  "depends_on": [
+   "W9-RV",
+   "W9-02",
+   "W1-02",
+   "W1-09"
+  ],
+  "acceptance": [
+   "#26 with signed URLs of <= 10 minutes, hash-reuse hint (same content_sha256 on another booking), receipt_viewed audit per list call"
+  ],
+  "security_controls": [
+   "2F; URLs minted only after the admin check; no URL logging",
+   "SB-10, SB-11"
+  ]
+ },
+ {
+  "id": "W10-02",
+  "title": "Customer gallery API (was G5-2 + TM-06, C-18)",
+  "wave": 10,
+  "role": "backend",
+  "files": [
+   "worker/portal/galleries.ts",
+   "worker/portal/slots/gallery.ts"
+  ],
+  "depends_on": [
+   "W9-RV",
+   "W9-03"
+  ],
+  "acceptance": [
+   "#13/#14 with the quota predicate (two tabs cannot exceed the quota), submit-and-lock (CO+R), CO+M on reads, hourly signed URLs; gallery id only from the owned booking; photo ids through (gallery_id, photo_id)"
+  ],
+  "security_controls": [
+   "Ownership + gallery status in every statement; set-ops idempotent",
+   "TM-06",
+   "SB-2, SB-5, SB-11"
+  ]
+ },
+ {
+  "id": "W10-03",
+  "title": "Receipt upload UI (was G5-3 + UX-13)",
+  "wave": 10,
+  "role": "frontend",
+  "files": [
+   "src/features/confirmation/ReceiptUpload.tsx",
+   "src/features/confirmation/receipt-encode.ts",
+   "src/features/confirmation/ConfirmationStageView.tsx"
+  ],
+  "depends_on": [
+   "W9-RV",
+   "W4-01",
+   "W9-02"
+  ],
+  "acceptance": [
+   "Shown only when receiptChannel = \"upload\"; images re-encoded to <= 2000 px JPEG, PDFs as-is; progress, retry, RECEIPT_ALREADY_PENDING treated as success; 44 px targets"
+  ],
+  "security_controls": [
+   "Client pre-checks mirror the server (the server decides); object URLs revoked; no file kept after upload",
+   "SB-12, SB-13"
+  ]
+ },
+ {
+  "id": "W10-04",
+  "title": "Admin gallery upload pipeline (was G5-4)",
+  "wave": 10,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-gallery/resize.worker.ts",
+   "src/features/admin-gallery/resize.ts",
+   "src/features/admin-gallery/upload-queue.ts"
+  ],
+  "depends_on": [
+   "W9-RV",
+   "W9-03"
+  ],
+  "acceptance": [
+   "Module worker, one decode at a time, bitmap closed, WebP ~0.80 -> JPEG fallback, 1600/480 px, 3 concurrent uploads with retries, resume by filename, beforeunload guard, cancellation"
+  ],
+  "security_controls": [
+   "Originals never uploaded; metadata stripped by re-encoding (the server refuses metadata anyway); listeners removed; worker terminated on unmount",
+   "SB-12, SB-13"
+  ]
+ },
+ {
+  "id": "W10-RV",
+  "title": "Wave-10 adversarial review (Train B)",
+  "wave": 10,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w10-review.md"
+  ],
+  "depends_on": [
+   "W10-01",
+   "W10-02",
+   "W10-03",
+   "W10-04"
+  ],
+  "acceptance": [
+   "Two reviewers; gated flows under env.mediatest with 2F on/off; N-36 gallery part"
+  ],
+  "security_controls": [
+   "Read-only; local only"
+  ]
+ },
+ {
+  "id": "W11-01",
+  "title": "Admin receipt review (was G6-1 + TM-20)",
+  "wave": 11,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-receipt/AdminReceiptSection.tsx",
+   "src/features/admin-receipt/receipt-admin-api.ts",
+   "src/features/admin-receipt/registration.ts"
+  ],
+  "depends_on": [
+   "W10-RV",
+   "W10-01"
+  ],
+  "acceptance": [
+   "Receipt image/PDF link (signed), zoom, expected amount, hash-reuse hint, confirm/reject via BookingActions; warns not to follow links inside a receipt PDF"
+  ],
+  "security_controls": [
+   "<img>/<a download> only from /api/media URLs; PDF never embedded inline",
+   "TM-20",
+   "SB-11, SB-12"
+  ]
+ },
+ {
+  "id": "W11-02",
+  "title": "Admin gallery section (was G6-2)",
+  "wave": 11,
+  "role": "frontend",
+  "files": [
+   "src/features/admin-gallery/AdminGallerySection.tsx",
+   "src/features/admin-gallery/gallery-admin-api.ts",
+   "src/features/admin-gallery/registration.ts"
+  ],
+  "depends_on": [
+   "W10-RV",
+   "W10-04"
+  ],
+  "acceptance": [
+   "Create (quota source shown), upload via W10-04, open/extend, selection progress, export .txt/comma list (Blob, revoked)"
+  ],
+  "security_controls": [
+   "Filenames rendered as text; export audited server-side",
+   "SB-6, SB-12"
+  ]
+ },
+ {
+  "id": "W11-03",
+  "title": "Customer gallery selection (was G6-3 + UX-13)",
+  "wave": 11,
+  "role": "frontend",
+  "files": [
+   "src/features/gallery/GalleryStageView.tsx",
+   "src/features/gallery/gallery-api.ts",
+   "src/features/gallery/use-selection-queue.ts",
+   "src/features/gallery/registration.ts"
+  ],
+  "depends_on": [
+   "W10-RV",
+   "W10-02"
+  ],
+  "acceptance": [
+   "Grid with lazy thumbnails (width/height); tapping a tile opens the lightbox; a separate 44 px select toggle with aria-pressed and icon + text; counter «اخترتِ {n} من أصل {quota}» announced politely; at quota the toggle stays focusable and explains why; debounced idempotent ops with rollback; submit dialog; locked state"
+  ],
+  "security_controls": [
+   "No URLs persisted; queue flushed/aborted on unmount",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W11-04",
+  "title": "Selection reminders and orphan sweep, two-phase (was G6-4 + TM-15)",
+  "wave": 11,
+  "role": "backend",
+  "files": [
+   "worker/jobs/selection-reminders.ts",
+   "worker/jobs/orphan-sweep.ts",
+   "worker/jobs/registry.ts",
+   "worker/emails/gallery.ts"
+  ],
+  "depends_on": [
+   "W10-RV",
+   "W10-02",
+   "W8-02"
+  ],
+  "acceptance": [
+   "-7 d/-2 d/overdue per ADR; orphan sweep Fridays (Riyadh) for unreferenced R2 objects older than 24 h, only with PM; claim -> delete -> mark; bounded paging; random claim tokens"
+  ],
+  "security_controls": [
+   "Never deletes a referenced key; counts-only logging",
+   "TM-15",
+   "SB-7, SB-11"
+  ]
+ },
+ {
+  "id": "W11-RV",
+  "title": "Wave-11 adversarial review (Train B)",
+  "wave": 11,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w11-review.md"
+  ],
+  "depends_on": [
+   "W11-01",
+   "W11-02",
+   "W11-03",
+   "W11-04"
+  ],
+  "acceptance": [
+   "Two reviewers; UI XSS sweep of gallery/receipt views; N-46 for the new jobs"
+  ],
+  "security_controls": [
+   "Read-only; local only"
+  ]
+ },
+ {
+  "id": "W12-01",
+  "title": "Gallery lightbox on the existing dialog pattern (was G7-1 + UX-13)",
+  "wave": 12,
+  "role": "frontend",
+  "files": [
+   "src/features/gallery/GalleryLightbox.tsx",
+   "src/features/gallery/GalleryStageView.tsx"
+  ],
+  "depends_on": [
+   "W11-RV",
+   "W11-03"
+  ],
+  "acceptance": [
+   "Extends the native <dialog> pattern of src/pages/portfolio/Lightbox.tsx with its RTL arrow and swipe mapping; Escape and optionally Android Back close; focus trap/return; select from the lightbox; reduced-motion safe"
+  ],
+  "security_controls": [
+   "Listeners removed on close; no new storage",
+   "SB-12"
+  ]
+ },
+ {
+  "id": "W12-02",
+  "title": "Train B documentation: switching private media on (new)",
+  "wave": 12,
+  "role": "docs",
+  "files": [
+   "docs/OPERATIONS.md",
+   "docs/SECURITY.md",
+   "runs/redo-v2/HANDOFF.md"
+  ],
+  "depends_on": [
+   "W11-RV"
+  ],
+  "acceptance": [
+   "Switch-on procedure (PDPL sign-off, R2 bucket private with no custom domain and no CORS (N-47), signing key rotation, 2F enrolment, preflight changes), retention enablement conditions (D11), receipt handling rules"
+  ],
+  "security_controls": [
+   "Names only, never values",
+   "SB-8"
+  ]
+ },
+ {
+  "id": "W12-RV",
+  "title": "Wave-12 adversarial review (Train B)",
+  "wave": 12,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w12-review.md"
+  ],
+  "depends_on": [
+   "W12-01",
+   "W12-02"
+  ],
+  "acceptance": [
+   "Two reviewers; lightbox keyboard/RTL; docs checked against the code"
+  ],
+  "security_controls": [
+   "Read-only"
+  ]
+ },
+ {
+  "id": "W13-01",
+  "title": "Red team D: private media (new, from G8-1/G8-2 media parts)",
+  "wave": 13,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/security/golive/w13-redteam-media.md"
+  ],
+  "depends_on": [
+   "W12-RV"
+  ],
+  "acceptance": [
+   "Upload and serve attacks N-23, N-24, N-37, N-38, N-47, N-48; synonym-path and binding-merge attempts; two-customer IDOR on gallery and receipts; signed-URL sharing and replay; admin 2F on/off"
+  ],
+  "security_controls": [
+   "env.mediatest and preview only"
+  ]
+ },
+ {
+  "id": "W13-02",
+  "title": "Runtime QA walk, mediatest (from G8-4)",
+  "wave": 13,
+  "role": "docs",
+  "files": [
+   "runs/redo-v2/verification/train-b-qa.md"
+  ],
+  "depends_on": [
+   "W12-RV"
+  ],
+  "acceptance": [
+   "mediatest walk: upload receipt -> reject -> re-upload -> confirm -> gallery -> select exactly the quota -> submit -> production -> handover -> complete; retention dry run; accessibility of the gallery and lightbox at 375 px"
+  ],
+  "security_controls": [
+   "Local only"
+  ]
+ },
+ {
+  "id": "W13-03",
+  "title": "Train B dark release (new; owner-executed)",
+  "wave": 13,
+  "role": "fullstack",
+  "files": [
+   "runs/redo-v2/release/train-b-release-log.md"
+  ],
+  "depends_on": [
+   "W13-01",
+   "W13-02"
+  ],
+  "acceptance": [
+   "Gate B met (zero open critical/high); train-b merged into the release branch; release.mjs production deploy; preflight proves no r2_buckets, PDPL_SIGNOFF_REF or MEDIA_SIGNING_KEY; every gated route answers 503 in production"
+  ],
+  "security_controls": [
+   "Owner approval per production write",
+   "Launch floor unchanged; rollback only >= floor",
+   "SB-11, SB-19"
+  ]
+ }
+]

@@ -1,0 +1,124 @@
+{
+  "_about": "Orchestrator amendments to 11-units.json after Wave 0 (security commit) and W0-02 traceability (security/golive/w0-traceability.md §11–§12). Applied by the orchestrator when it builds each wave's args. 2026-09-29.",
+  "renames": {
+    "migrations/0007_golive_admin_settings.sql": "migrations/0008_golive_admin_settings.sql",
+    "migrations/0008_golive_hardening.sql": "migrations/0009_golive_hardening.sql",
+    "runs/redo-v2/d1/0007-0008-verification.md": "runs/redo-v2/d1/0008-0009-verification.md",
+    "worker/ratelimit.ts": "worker/rate-limit.ts"
+  },
+  "add_files": {
+    "W1-02": [
+      "worker/users.ts"
+    ],
+    "W1-07": [
+      "src/lib/server-error-messages.ts"
+    ],
+    "W1-08": [
+      "src/auth/ReauthenticationHost.tsx",
+      "src/lib/modal-stack.ts"
+    ],
+    "W1-10": [
+      "src/lib/ascii-digits.ts",
+      "src/auth/person-name.ts"
+    ],
+    "W1-12": [
+      "scripts/grant-admin.mjs",
+      "scripts/revoke-sessions.mjs",
+      "scripts/lib/wrangler-d1.mjs"
+    ],
+    "W5-01": [
+      "src/features/admin-portal/AdminSecurityPanel.tsx",
+      "src/features/admin-portal/AdminSecurityPanel.css"
+    ],
+    "W2-01": [
+      "migrations/0010_business_identity.sql"
+    ]
+  },
+  "extra_acceptance": {
+    "W1-01": [
+      "R-01: Wave 0 already landed migrations/0007_users_email_verified_and_token_revocation.sql (users.email_verified_at, users.tokens_valid_after). The plan's DDL is committed as 0008_golive_admin_settings.sql (plan §2.2) and 0009_golive_hardening.sql (plan §2.4) WITHOUT re-adding those two columns; keep Wave 0's column types and record the difference in the verification doc; the full chain 0001, 0003–0009 applies cleanly on a fresh local D1 and the §2.3/§2.5 checks are re-run against it."
+    ],
+    "W1-02": [
+      "R-02: revocation compares the token's auth_time (sign-in time) with users.tokens_valid_after — never iat — so a session that refreshed its ID token after 'sign out everywhere' is still rejected (GAP-06: a test proves it).",
+      "R-04/R-05: adopt the plan's names and error contract (11 §3.1): 403 REAUTH_REQUIRED, SECOND_FACTOR_REQUIRED; revoked/invalid tokens stay 401; the plan's MFA vars (ADMIN_MEDIA_MFA, ADMIN_SETTINGS_2F) replace Wave 0's ADMIN_REQUIRE_MFA (remove it; no global MFA lock-out switch).",
+      "R-06: private-media READS need a sign-in ≤ 12 h (requireMediaFreshSignIn); only submit-and-lock and other writes named in the plan need ≤ 10 min.",
+      "Consolidate Wave 0's worker/users.ts helpers with the plan's module layout; no duplicate helpers."
+    ],
+    "W1-03": [
+      "R-04: binding/var names follow the plan (RL_BOOKING, RL_PROFILE and the rest of W1-03#2); rename Wave 0's BOOKING_RATE_LIMITER / PROFILE_RATE_LIMITER in wrangler.jsonc (production and env.preview) and platform-env.d.ts; keep PREVIEW_READ_ONLY and preview_urls:false from Wave 0."
+    ],
+    "W1-06": [
+      "GAP-03: the settings schema includes the business-identity fields legal_name, licence_number (freelance/CR document number) and vat_status (registered | not_registered | unknown) with content rules; they are public once saved and are rendered on the disclosure page only when filled."
+    ],
+    "W1-07": [
+      "R-05: the client maps the plan's codes (403 REAUTH_REQUIRED → re-auth dialog and one retry; SECOND_FACTOR_REQUIRED; OPEN_REQUEST_LIMIT; 401 → signed-out handling) and consolidates Wave 0's src/lib/server-error-messages.ts (no duplicate message tables)."
+    ],
+    "W1-08": [
+      "R-07: consolidate Wave 0's src/auth/ReauthenticationHost.tsx and src/lib/modal-stack.ts with the plan's src/features/reauth/ReauthDialog.tsx + use-reauth-retry.ts — exactly one re-auth dialog in the app; delete the superseded file only if it is in this unit's file list and nothing else imports it (otherwise leave a thin re-export and say so)."
+    ],
+    "W1-10": [
+      "R-07: shared/text.ts is the single home of the digit normaliser and free-text/name validation; Wave 0's src/lib/ascii-digits.ts and src/auth/person-name.ts become thin re-exports (or are removed if nothing outside this unit imports them)."
+    ],
+    "W1-12": [
+      "R-03: the plan's scripts/promote-admin.mjs is the single admin script (promote by uid, --replace, stamps tokens_valid_after, writes admin_promoted/admin_demoted audit rows once the audit table exists, prints the bookmark command, verifies exactly one admin). Fold Wave 0's scripts/grant-admin.mjs (--demote), scripts/revoke-sessions.mjs and scripts/lib/wrangler-d1.mjs into it or keep the lib as its helper; delete grant-admin.mjs once promote-admin.mjs covers it. It never touches --remote without an explicit flag and prints the exact SQL before running."
+    ],
+    "W1-15": [
+      "R-04/R-07: the limiter lives in the landed worker/rate-limit.ts (the plan's worker/ratelimit.ts); binding names follow W1-03 (RL_*); keep the safe fallback when a binding is absent; the plan's OPEN_REQUEST_LIMIT code replaces TOO_MANY_OPEN_REQUESTS (coordinate: W1-14 owns bookings.ts)."
+    ],
+    "W1-14": [
+      "R-05: bookings.ts and profile.ts use the plan's codes (OPEN_REQUEST_LIMIT, 413 PAYLOAD_TOO_LARGE, 429 RATE_LIMITED) and the RL_* binding names via worker/rate-limit.ts (W1-15)."
+    ],
+    "W2-01": [
+      "GAP-05: a bank-detail change saved within 30 days after a studio-WhatsApp-number change (or vice versa) takes 72 h instead of 24 h to become effective and raises the admin alert banner; the settings API accepts the GAP-03 business-identity fields with content rules.",
+      "W1 gate carry-over (GAP-03): add migrations/0010_business_identity.sql (additive) that stores legal_name, licence_number and vat_status using the 0008 settings/settings_revisions model, with the 0009-style no-update/no-delete/no-replace and key-range triggers; the settings API reads/writes them through W1-06 contracts."
+    ],
+    "W2-10": [
+      "GAP-04: the work queue flags customers with repeated expired or abandoned holds (count within 90 days) so the admin can decide before approving again."
+    ],
+    "W2-13": [
+      "GAP-05: the customer's 'check with us on WhatsApp' link and number use the studio number that was effective when the booking was approved if the number changed since, with a visible notice."
+    ],
+    "W3-16": [
+      "GAP-03 / D19(d): write the privacy notice and e-commerce disclosure in Arabic strictly from the system's actual data handling (what is collected, why, where it is stored and processed — Cloudflare and Google/Firebase servers outside Saudi Arabia, retention, rights, how to ask for access/correction/erasure via the studio WhatsApp), render the business-identity fields from settings only when filled, mark the page 'draft pending legal review' in the handoff docs (not on the page), invent nothing (no CR numbers, no VAT claims, no response times)."
+    ],
+    "W3-19": [
+      "R-04: the release preflight refuses any MFA-required var (ADMIN_MEDIA_MFA, ADMIN_SETTINGS_2F) unless the owner's TOTP enrolment is recorded, so the only admin can never be locked out."
+    ],
+    "W4-06": [
+      "GAP-03: the settings UI edits legal_name, licence_number and vat_status."
+    ],
+    "W5-04": [
+      "GAP-07: OPERATIONS.md documents the Workers Free plan daily request and D1 read/write quotas, how to watch them in the dashboard, the rate limits that protect them and the recommendation to move to Workers Paid before marketing pushes. GAP-01: document that the handoff repository is a clean re-rooted history (the original photos with camera metadata are not in it). GAP-02: document the data-subject-request and erasure procedure using scripts/erase-customer.mjs."
+    ],
+    "W2-16": [
+      "W1 gate carry-over: rename the POST /api/bookings open-request wire code TOO_MANY_OPEN_REQUESTS to the plan code OPEN_REQUEST_LIMIT together with the client mapping (W1 reverted it to avoid a regression)."
+    ]
+  },
+  "new_units": [
+    {
+      "id": "W5-06",
+      "title": "Customer erasure script for Train A (GAP-02, C-19 part, SEC-17)",
+      "wave": 5,
+      "role": "data",
+      "files": [
+        "scripts/erase-customer.mjs"
+      ],
+      "depends_on": [
+        "W4-RV",
+        "W1-12"
+      ],
+      "acceptance": [
+        "Owner-run script (same safety model as promote-admin.mjs): --local by default, --remote only with an explicit flag, dry-run by default printing counts and the exact SQL, --apply to execute; identifies the customer by uid only.",
+        "Erasure pseudonymises the users row (erased_at set, name/phone/email replaced) and purges free text (notes, questionnaire answers, delivery address) while keeping booking/financial rows needed for records (R9) with the uid only; profile writes on an erased row return 410 (landed in Wave 0).",
+        "Writes an append-only audit row (admin_audit_log once it exists) with counts only; prints no personal data.",
+        "Runtime check on a fresh local D1 with seed data: before/after counts match; re-running is a no-op."
+      ],
+      "security_controls": [
+        "SB-4 bound parameters only",
+        "SB-7 no PII in output",
+        "SB-10 audit row",
+        "SB-13 PDPL erasure path"
+      ]
+    }
+  ]
+}
