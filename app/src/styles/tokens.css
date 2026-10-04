@@ -1,0 +1,179 @@
+/* =============================================================================
+   Design tokens — Sundus Yar (redo-v2)
+   Source of truth: runs/redo-v2/03-design-system.md §3.1 ("`:root` block").
+   Transcribed verbatim from that section, plus:
+     - a LEGACY ALIASES block (marked below) so every custom property already
+       referenced by the CSS files under app/src (component stylesheets this wave does not
+       own) keeps resolving to a sensible new-system value.
+     - the `.on-dark` context override, also specified in §3.1, placed here
+       because it is pure token re-declaration (no reset/behaviour).
+     - "Cairo Fallback" / "El Messiri Fallback" as the second family in the
+       two font stacks (metric-matched faces declared in fonts.css).
+   NOT here: the `@media (prefers-reduced-motion: reduce)` rule that closes the
+   §3.1 code fence in the design doc. That behavioural rule lives in base.css
+   instead (T3 asks for it there explicitly) so reduced-motion handling has one
+   home, not two. See src/styles/README.md.
+   ========================================================================= */
+
+:root {
+  /* ===== Colour — core (5) ===== */
+  --color-paper: #FAF6EF;
+  --color-surface: #FFFCF7;
+  --color-ink: #241E1A;
+  --color-accent: #8A6A2E;
+  --color-line: #8F8270;
+
+  /* Colour — derived tints (shades/tints of the 5 above, see design-system §1.3) */
+  --color-ink-muted: #5C5148;
+  --color-ink-on-dark-muted: #C9BFB3;
+  --color-accent-deep: #6E5322;
+  --color-accent-soft: #C7A75E;
+  --color-paper-sunk: #F1EAE0;
+  --color-hairline: #EAE1D5;
+
+  /* Colour — semantic (4), each with a pale tint for badge/chip backgrounds */
+  --color-success: #2F6D4F;      --color-success-tint: #E4EFE7;
+  --color-warning: #8A5A12;      --color-warning-tint: #F6E9D2;
+  --color-danger:  #9C2F2A;      --color-danger-tint:  #F5E3DF;
+  --color-info:    #2D5F7A;      --color-info-tint:    #E1EBF0;
+
+  /* Shadow tint — warm (ink-based), never pure black */
+  --shadow-ink: 36 30 26;
+
+  /* ===== Typography ===== */
+  /* Second in each stack: the metric-matched fallback faces (fonts.css). */
+  --font-display: "El Messiri", "El Messiri Fallback", "Segoe UI", Tahoma, sans-serif;
+  --font-text: "Cairo", "Cairo Fallback", "Segoe UI", Tahoma, sans-serif;
+
+  --text-display-xl: clamp(2.5rem, 9vw, 4.5rem);
+  --text-display-lg: clamp(2rem, 6vw, 3.25rem);
+  --text-heading-md: clamp(1.25rem, 3vw, 1.55rem);
+  --text-heading-sm: clamp(1.05rem, 2vw, 1.2rem);
+  --text-body-lg: clamp(1.05rem, 2.2vw, 1.25rem);
+  --text-body-md: clamp(0.95rem, 1.2vw, 1.05rem);
+  --text-body-sm: clamp(0.85rem, 1vw, 0.92rem);
+  --text-label: clamp(0.85rem, 0.9vw, 0.95rem);
+  --text-numeral-price: clamp(1.5rem, 4vw, 2.25rem);
+
+  --leading-display: 1.25;
+  --leading-heading: 1.4;
+  --leading-body-lg: 1.8;
+  --leading-body-md: 1.7;
+  --leading-body-sm: 1.65;
+  --leading-label: 1.4;
+
+  /* ===== Spacing (4px base) ===== */
+  --space-3xs: 0.25rem;  /* 4px  */
+  --space-2xs: 0.5rem;   /* 8px  */
+  --space-xs:  0.75rem;  /* 12px */
+  --space-sm:  1rem;     /* 16px */
+  --space-md:  1.5rem;   /* 24px */
+  --space-lg:  2rem;     /* 32px */
+  --space-xl:  3rem;     /* 48px */
+  --space-2xl: 4rem;     /* 64px */
+  --space-3xl: 6rem;     /* 96px */
+  --space-4xl: 8rem;     /* 128px */
+
+  --page-gutter: clamp(1rem, 4vw, 2.5rem);
+  --section-space: clamp(4rem, 8vw, 7rem);
+
+  /* ===== Radii — ONE shape language: a single 4px unit, three multiples ===== */
+  --radius-unit: 0.25rem;
+  --radius-sm: 0.25rem;   /* inputs, small buttons, status badges (chips) */
+  --radius-md: 0.5rem;    /* cards, dialogs, photo tiles, dropdowns */
+  --radius-lg: 0.75rem;   /* mobile bottom sheets, large modal containers */
+  --radius-full: 999px;   /* pills: selectable filter/option chips, avatar, WhatsApp button */
+  /* Rule: rounded-rect (sm/md/lg) = informational/static. Full pill = interactive/selectable.
+     Never mix the two meanings on the same shape. */
+
+  /* ===== Shadows — warm (ink-tinted), 3 levels ===== */
+  --shadow-sm: 0 1px 2px rgb(var(--shadow-ink) / 0.06), 0 1px 1px rgb(var(--shadow-ink) / 0.04);
+  --shadow-md: 0 8px 24px rgb(var(--shadow-ink) / 0.10), 0 2px 6px rgb(var(--shadow-ink) / 0.06);
+  --shadow-lg: 0 24px 48px rgb(var(--shadow-ink) / 0.16), 0 8px 16px rgb(var(--shadow-ink) / 0.08);
+
+  /* ===== Z-index ===== */
+  --z-header: 100;
+  --z-dropdown: 200;
+  --z-overlay: 900;
+  --z-dialog: 950;
+  --z-skip-link: 1000;
+  --z-toast: 1100;
+
+  /* ===== Breakpoints (4 max — reference these literal values in every @media;
+     CSS custom properties cannot be read inside @media conditions without a build
+     step, and D1 forbids adding one without the owner's approval, so these are
+     documented constants, not live tokens) =====
+     --bp-sm: 36rem   (576px)  paired/2-col forms begin, larger gallery grid
+     --bp-md: 48rem   (768px)  configurator 2-col, admin table view, stepper expands
+     --bp-lg: 64rem   (1024px) desktop header/nav, 2-col hero, dialogs center instead of sheet
+     --bp-xl: 80rem   (1280px) container hits max width, admin 3-col detail, wider gallery grid
+  */
+
+  /* ===== Container widths ===== */
+  --container-narrow: 48rem;  /* forms, dialogs, single-column text */
+  --container: 75rem;         /* default page content */
+  --container-wide: 90rem;    /* admin queue/table, gallery management */
+
+  /* ===== Motion ===== */
+  --duration-instant: 100ms;
+  --duration-fast: 180ms;
+  --duration-base: 240ms;
+  --duration-slow: 400ms;
+  --duration-deliberate: 600ms;
+
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ===== Focus ring ===== */
+  --focus-ring-width: 3px;
+  --focus-ring-color: var(--color-accent);
+  --focus-ring-offset: 3px;
+
+  /* ===== Controls ===== */
+  --control-height: 2.75rem;       /* 44px min touch target */
+  --control-height-lg: 3.15rem;    /* primary CTA height */
+}
+
+/* Dark-background context override (footer, contact band): swap the two
+   text-on-dark tokens components should read instead of the light-mode pair.
+   Put this class on any ink-background container (the footer, the contact
+   band and the lightbox use it). */
+.on-dark {
+  --text-color: var(--color-paper);
+  --text-muted-color: var(--color-ink-on-dark-muted);
+  --link-color: var(--color-accent-soft);
+  --focus-ring-color: var(--color-accent-soft);
+}
+
+/* =============================================================================
+   LEGACY ALIASES — do not add new usage of these names.
+   Every CSS file under app/src was grepped for `var(--…)` before this file was
+   written. Names already identical to a token above (e.g. --color-accent,
+   --color-surface, --page-gutter, --section-space) need no alias: they resolve
+   to the block above automatically. The names below are OLD globals that no
+   longer exist under those spellings in the new system; component stylesheets
+   this wave does not own (AdminDashboard.css, AuthDialog.css,
+   BlockedDatesManager.css, BookingActions.css, BookingCalendar.css,
+   EmailVerificationGate.css, MyBookings.css, PackageConfigurator.css) still
+   reference them directly, or indirectly through their own locally-scoped
+   `--blocked-*` / `--customer-*` / `--verification-*` custom properties (each
+   of those is declared as `var(--color-x, #fallback)` inside its own
+   component root class, so once the old global name resolves here, those
+   resolve too — no separate alias needed for them).
+   Remove an entry once every file referencing it has migrated to the token
+   names above directly.
+   ========================================================================= */
+:root {
+  --color-background: var(--color-paper);
+  --color-surface-muted: var(--color-paper-sunk);
+  --color-text: var(--color-ink);
+  --color-muted: var(--color-ink-muted);
+  --color-accent-dark: var(--color-accent-deep);
+  --color-border: var(--color-line);
+  --color-dark: var(--color-ink);
+  --color-light-text: var(--color-paper);
+  --content-width: var(--container);
+  --small-radius: var(--radius-sm);
+}

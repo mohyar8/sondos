@@ -1,0 +1,11 @@
+#!/bin/sh
+# W1-13 (M6, SB-19): git runs this hook before the merge commit it creates
+# itself. Into a release/* branch, the commit is created only after the full
+# verify, with no baseline waiver, passes on the merge result; on a failure
+# run `git merge --abort`, fix it on the branch you merge and merge again.
+# `git commit` (after a conflict, --no-commit, --squash or a failure here)
+# runs .githooks/pre-commit instead, which verifies the same way. Merges into
+# other branches pass through. A fast-forward creates no commit and runs no
+# hook: the release gate runs `npm run verify -- --release` on the tag.
+# Enable once per clone: npm run hooks:install
+exec node scripts/verify.mjs --hook=pre-merge-commit

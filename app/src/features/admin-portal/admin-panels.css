@@ -1,0 +1,362 @@
+/* =============================================================================
+   Admin panels — the shared layout of the admin portal's registered booking
+   sections and workspace tabs (sections.ts). A section sits inside
+   .admin-portal__section (surface, AdminDashboard.css); a tab sits in
+   .admin-tab-panel on the paper page. Each component imports this file
+   itself, so it loads with the first registered feature's chunk. Nothing in
+   the app uses these classes until a feature is registered, so the dashboard
+   renders exactly as before.
+
+   Tokens only (tokens.css), logical properties only, the documented
+   breakpoints only. Buttons, fields, notices and badges come from
+   components.css; this file lays them out.
+
+   Contrast (UX-12; computed table in design-system §1.5): accent text is
+   never set directly. Every rule that paints a background also sets
+   --admin-feature-accent-text for what sits on it, and .admin-feature__accent
+   reads it:
+     paper, surface                       → --color-accent       (4.66–4.91:1)
+     paper-sunk, hairline, semantic tints → --color-accent-deep  (5.55–6.09:1)
+     ink                                  → --color-accent-soft  (7.15:1)
+   --admin-feature-accent-text only ever holds one of those three tokens.
+
+   Targets (UX-13): every control is at least --control-height (44px) in both
+   directions, and controls sit in flex/grid containers whose gap is at least
+   --space-2xs (8px). State is never colour alone: a pressed toggle also shows
+   a mark (.admin-feature__mark), an unavailable one a dashed border.
+   ========================================================================= */
+
+.admin-feature {
+  --admin-feature-accent-text: var(--color-accent);
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-md);
+  color: var(--color-ink);
+}
+
+/* ---------- Header: heading, meta («آخر تحديث») and actions ---------- */
+.admin-feature__header {
+  display: flex;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.admin-feature__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+}
+
+.admin-feature__lead {
+  margin: 0;
+  max-inline-size: 65ch;
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body-md);
+}
+
+.admin-feature__meta {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.admin-feature__accent {
+  color: var(--admin-feature-accent-text);
+  font-weight: 700;
+}
+
+/* Dates, amounts, counts and references (inside <bdi> where they are data). */
+.admin-feature__number {
+  font-variant-numeric: tabular-nums lining-nums;
+  unicode-bidi: isolate;
+}
+
+/* ---------- Toolbars and action rows ---------- */
+.admin-feature__toolbar {
+  display: flex;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.admin-feature__toolbar .field {
+  margin-block-end: 0;
+}
+
+.admin-feature__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* .btn is already 44px tall; icon-only buttons also need the width. */
+.admin-feature .btn {
+  min-inline-size: var(--control-height);
+}
+
+@media (max-width: 35.99rem) {
+  .admin-feature__actions > .btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---------- Groups (e.g. one queue section) ---------- */
+.admin-feature__group {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-xs);
+}
+
+.admin-feature__group-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin: 0;
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+  font-weight: 700;
+}
+
+/* ---------- Lists of items (queue items, customers, slots, audit rows) ---------- */
+.admin-feature__list {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-feature__item {
+  --admin-feature-accent-text: var(--color-accent);
+  display: flex;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.admin-feature__item-main {
+  display: grid;
+  min-inline-size: 0;
+  flex: 1 1 16rem;
+  gap: var(--space-2xs);
+}
+
+.admin-feature__item-title {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Cards (e.g. the «اليوم» summary): 1 → 2 → 4 columns ---------- */
+.admin-feature__cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 48rem) {
+  .admin-feature__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 80rem) {
+  .admin-feature__cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.admin-feature__card {
+  --admin-feature-accent-text: var(--color-accent);
+  display: grid;
+  min-inline-size: 0;
+  align-content: start;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Recessed box (expected vs received, bank revision, notes) ---------- */
+.admin-feature__box {
+  --admin-feature-accent-text: var(--color-accent-deep);
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-sunk);
+}
+
+/* Notices and badges paint tint or sunk backgrounds (components.css). */
+.admin-feature .notice,
+.admin-feature .badge {
+  --admin-feature-accent-text: var(--color-accent-deep);
+}
+
+/* ---------- Facts (label/value pairs) ---------- */
+.admin-feature__facts {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.admin-feature__fact {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-2xs);
+}
+
+.admin-feature__fact dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+}
+
+.admin-feature__fact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 36rem) {
+  .admin-feature__fact {
+    grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr);
+    align-items: baseline;
+  }
+}
+
+/* ---------- Empty state («لا يوجد ما يحتاج متابعة اليوم») ---------- */
+.admin-feature__empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-muted);
+}
+
+/* ---------- Table (audit log, slots): hairline rows, numbers end-aligned ---------- */
+.admin-feature__table-wrap {
+  max-inline-size: 100%;
+  overflow-x: auto;
+}
+
+.admin-feature__table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.admin-feature__table th,
+.admin-feature__table td {
+  padding-block: var(--space-xs);
+  padding-inline: var(--space-sm);
+  border-block-end: 1px solid var(--color-hairline);
+  text-align: start;
+  vertical-align: top;
+}
+
+.admin-feature__table th {
+  color: var(--color-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-feature__table .admin-feature__number {
+  text-align: end;
+}
+
+/* ---------- Toggle button (aria-pressed), e.g. a filter or a view switch ---------- */
+.admin-feature__toggle {
+  --admin-feature-accent-text: var(--color-accent);
+  display: inline-flex;
+  min-block-size: var(--control-height);
+  min-inline-size: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  padding-block: var(--space-2xs);
+  padding-inline: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-full);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  cursor: pointer;
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.admin-feature__toggle[aria-pressed="true"] {
+  --admin-feature-accent-text: var(--color-accent-soft);
+  border-color: var(--color-ink);
+  color: var(--color-surface);
+  background: var(--color-ink);
+}
+
+/* Unavailable but still focusable, so it can explain why. It repaints the
+   light pill even when pressed, so muted text never lands on ink; a pressed
+   one keeps its mark. */
+.admin-feature__toggle[aria-disabled="true"] {
+  --admin-feature-accent-text: var(--color-accent);
+  border-style: dashed;
+  border-color: var(--color-line);
+  color: var(--color-ink-muted);
+  background: var(--color-surface);
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .admin-feature__toggle[aria-pressed="false"]:not([aria-disabled="true"]):hover {
+    --admin-feature-accent-text: var(--color-accent-deep);
+    background: var(--color-paper-sunk);
+  }
+}
+
+/* The check mark of a pressed toggle. */
+.admin-feature__mark {
+  display: none;
+  flex: 0 0 auto;
+  inline-size: 1.1em;
+  block-size: 1.1em;
+}
+
+.admin-feature__toggle[aria-pressed="true"] .admin-feature__mark {
+  display: inline-block;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .admin-feature__toggle {
+    transition: none;
+  }
+}

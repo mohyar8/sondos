@@ -1,0 +1,693 @@
+# المصورة سندس يار — Sundus Yar website and booking system
+
+The public website and online booking system of **Sundus Yar (المصورة سندس يار)**, a bridal photographer
+(مصورة عرائس) in Madinah (المدينة المنورة). The whole site is in Arabic and right-to-left (`lang="ar" dir="rtl"`),
+and all text addresses the bride in the feminine singular. There is no English version and no language switcher.
+
+This README is for the owner (a developer) and for anyone who maintains the site later. It was written on
+2026-09-24 against commit `4bfb3b5` (Run 2). The planning documents behind every decision are in
+`../runs/redo-v2/` (see [Planning documents](#planning-documents-and-open-decisions)).
+
+---
+
+## Contents
+
+1. [What the site is](#what-the-site-is)
+2. [Stack](#stack)
+3. [Prerequisites](#prerequisites)
+4. [Setup](#setup)
+5. [Run locally](#run-locally)
+6. [Scripts](#scripts)
+7. [Project structure](#project-structure)
+8. [How to swap or add photos](#how-to-swap-or-add-photos)
+9. [How to regenerate the brand assets](#how-to-regenerate-the-brand-assets)
+10. [How to edit copy](#how-to-edit-copy)
+11. [Prices](#prices)
+12. [Design tokens, CSS and motion](#design-tokens-css-and-motion)
+13. [Adding a route](#adding-a-route)
+14. [Deploy](#deploy)
+15. [Security and privacy notes](#security-and-privacy-notes)
+16. [Planning documents and open decisions](#planning-documents-and-open-decisions)
+17. [Known issues](#known-issues-as-of-2026-09-24)
+
+---
+
+## What the site is
+
+| Route | Arabic label | What it does |
+|---|---|---|
+| `/` | الرئيسية | Home page: hero, her story («أنا سندس»), what makes her work different, featured work, services, how booking works, a privacy and consent section (خصوصيتكِ أولًا), FAQ, and the contact band with WhatsApp. |
+| `/portfolio` | الأعمال | The owner's 32 photos, with a category filter (الكل, التفاصيل, الأيادي والخواتم, العروسان, لحظات من اليوم) and a full-screen lightbox. The lightbox works with the keyboard (arrow keys, Home/End, Esc) and with swipe. |
+| `/packages` | الباقات | The package configurator (التغطية, الألبوم, المطبوعات), an estimated price, a Riyadh-time availability calendar, and the booking request. |
+| `/my-bookings` | حجوزاتي | Private. The bride's own booking requests and their status. It needs a signed-in account with a verified email. |
+| `/admin` | لوحة الإدارة | Private. The owner's dashboard: the booking queue, status actions and blocked dates. It needs a verified email **and** `users.role = 'admin'` in D1. |
+
+Any other path shows the Home page (`src/layout/navigation.ts`, `getActiveAppPath`).
+
+**Booking today.** The bride sends a request, which starts in `pending_review`. The admin approves it
+(`approved_hold`, a 24-hour hold, set in `worker/admin-workflow.ts:17`) or rejects it. The admin then records the
+contract and payment steps by hand, up to `confirmed`. All statuses are listed in `shared/admin.ts`. Online
+receipt upload, private photo galleries, photo selection and album handover booking are planned in
+`runs/redo-v2`, but they are **not built** and are gated (see [open decisions](#planning-documents-and-open-decisions)).
+
+**Privacy is part of the brand.** The site says «جميع الصور تُنشر بموافقة العروس» (every photo is published with
+the bride's consent). No public photo shows an identifiable bride's face.
+
+---
+
+## Stack
+
+- **Front end:** React 19 and TypeScript, built with Vite 8 as a single-page app. Routing is a small
+  History-API router in `src/App.tsx`. React Router is deliberately not used; the owner's constraints forbid it.
+  Pages other than Home are code-split (`src/layout/lazy-components.ts`).
+- **Back end:** one Cloudflare Worker (`worker/index.ts`). `wrangler.jsonc` sends `/api/*` to the Worker first
+  (`run_worker_first`), serves everything else as static assets, and falls back to `index.html`
+  (`not_found_handling: "single-page-application"`).
+  - API routes: `/api/health`, `/api/availability`, `/api/profile`, `/api/bookings`, `/api/bookings/me`, `/api/admin/*`.
+- **Database:** Cloudflare D1 (SQLite). The database is `sundus-yar-bookings` and the Worker binding is `DB`.
+  The schema is in `migrations/`.
+- **Authentication:** Firebase Auth in the browser (email and password, with email verification). The Worker
+  verifies Firebase ID tokens with `jose` (`worker/auth.ts`). The Worker's `FIREBASE_PROJECT_ID` var is set in
+  `wrangler.jsonc`.
+- **Email:** Resend, called from the Worker (`worker/email.ts`, templates in `worker/email-templates.ts`). Email is
+  optional: without its settings, bookings still work and no email is sent.
+- **Styling:** plain CSS on one token system (`src/styles/`), with native motion only (CSS transitions and
+  keyframes plus `IntersectionObserver`). There is no Tailwind, no CSS-in-JS and no animation library (decision D1).
+- **Fonts:** El Messiri 600 (display) and Cairo 400/700 (text), self-hosted through `@fontsource/*` (decision D9).
+- **Images:** AVIF and WebP, generated by Node scripts that use `sharp`, which is a dev-only dependency.
+
+Adding **any** new dependency needs the owner's approval (`runs/redo-v2/decisions.md`, "Binding constraints").
+
+---
+
+## Prerequisites
+
+- **Node 24** and **npm**. The project was built and checked on Node 24.16.0 and npm 11.13.0. There is no
+  `engines` field and no `.nvmrc`, so check your version yourself.
+- Git.
+- The Firebase web-app configuration for project `sundus-yar-website`. It is in the Firebase console → Project
+  settings → Your apps → Web app.
+- To deploy, access to the Cloudflare account that owns the Worker and the D1 database. Only the owner logs in.
+- Wrangler is a local dev dependency (4.124.0). Always run it as `npx wrangler …`.
+
+---
+
+## Setup
+
+```bash
+npm ci
+```
+
+`npm ci` installs exactly what `package-lock.json` lists, including `sharp` for the image scripts.
+
+### 1. Browser config: `.env.local`
+
+Create `app/.env.local` with these **names**. The values come from the Firebase console and are never committed.
+
+| Variable | Required? | Read in |
+|---|---|---|
+| `VITE_FIREBASE_API_KEY` | required | `src/lib/firebase.ts` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | required | 〃 |
+| `VITE_FIREBASE_PROJECT_ID` | required. It must be the same project as the Worker's `FIREBASE_PROJECT_ID`, because the Worker checks the token audience against that value. | 〃 |
+| `VITE_FIREBASE_APP_ID` | required | 〃 |
+| `VITE_FIREBASE_STORAGE_BUCKET` | optional | 〃 |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | optional | 〃 |
+
+If a required value is missing, the site still renders but sign-in is unavailable. The dialog shows «إعدادات
+تسجيل الدخول غير متاحة حاليًا.», and in dev mode it also names the missing variable.
+
+> Everything prefixed `VITE_` is compiled into the public JavaScript that every visitor downloads. Only the
+> Firebase web config belongs there. **Never put a secret in a `VITE_*` variable.**
+
+### 2. Worker config: `.dev.vars`
+
+Local Worker settings go in `app/.dev.vars`, one `NAME=value` per line. The file is git-ignored. These names are
+declared in `worker/email-env.d.ts` and are **all optional**:
+
+| Name | Purpose | If it is missing |
+|---|---|---|
+| `RESEND_API_KEY` | Resend API key (a **secret**) | No email is sent (`worker/email.ts:160-167`). |
+| `EMAIL_FROM` | Sender, as `address@domain` or `Display Name <address@domain>`, on a domain verified in Resend | No email is sent. |
+| `APP_BASE_URL` | Public origin used for the links inside emails (`/my-bookings`, `/admin?booking=…`). Locally this is the dev server's origin. | Booking and status emails are skipped (`worker/bookings.ts:376-380`, `worker/admin.ts:969-973`). |
+| `ADMIN_NOTIFICATION_EMAIL` | Where the "new booking request" email goes | The owner gets no new-request email. Customer emails still go out. |
+| `EMAIL_REPLY_TO` | Reply-To header | No Reply-To header is set. |
+
+`FIREBASE_PROJECT_ID` is a normal var in `wrangler.jsonc` and does not go in `.dev.vars`.
+
+**Platform settings (Run 3).** These live in `wrangler.jsonc` (vars/triggers) and are declared in
+`worker/platform-env.d.ts`:
+
+| Name | Where | Purpose |
+|---|---|---|
+| `ONLINE_CONFIRMATION` | var, `"off"` | Kill switch for the online confirmation flow (terms + deposit receipt). While `"off"`, new approvals stay on the legacy manual flow and no flow-2 booking exists. Switch it on only after the Run 4 go-live gates (runs/redo-v2/05-adr-architecture.md §4.5, decisions R1/D10). |
+| `PDPL_SIGNOFF_REF` | var, unset | Reference to the dated written answer on storing receipts/photos outside the Kingdom. Receipt, gallery and media routes refuse to serve (503) unless `ONLINE_CONFIRMATION` is `"on"` **and** this is set (worker/portal/gates.ts). |
+| `triggers.crons` | `"*/15 * * * *"`, `"0 0 * * *"` (UTC) | The scheduled jobs in `worker/jobs/registry.ts`: hold expiry and hold reminders (flow 2 only), the email outbox drain, and daily housekeeping. Every run is recorded in the `job_runs` table. Workers Paid is recommended (Free-plan cron limits are tight). |
+
+Test the jobs locally while `npm run dev` is running:
+`curl "http://localhost:5173/cdn-cgi/handler/scheduled?cron=*/15+*+*+*+*"`, then
+`npx wrangler d1 execute sundus-yar-bookings --local --command "SELECT * FROM job_runs"`.
+
+> With a real `RESEND_API_KEY` in `.dev.vars`, local testing sends **real emails to real addresses**. Leave it
+> out unless you mean to test email.
+
+---
+
+## Run locally
+
+```bash
+# 1. First time, and after anyone adds a migration: create or upgrade the LOCAL database
+npx wrangler d1 migrations apply sundus-yar-bookings --local
+
+# 2. Start the dev server: SPA with hot reload, plus the Worker and D1, on one origin
+npm run dev
+```
+
+Open <http://localhost:5173>. The Cloudflare Vite plugin runs the Worker in the same dev server, so `/api/*` works
+on the same port. For a quick check, <http://localhost:5173/api/health> should return
+`{"ok":true,"service":"sundus-yar-booking-api",…}`.
+
+The local database is stored in `.wrangler/state/`, which is git-ignored. The dev server and `wrangler … --local`
+use the same local copy. To check it, run `npx wrangler d1 migrations list sundus-yar-bookings --local`; it should
+print "No migrations to apply!".
+
+**Making yourself admin locally:**
+
+1. On the local site, create an account, complete the profile and verify the email. Saving the profile creates your
+   row in `users` with role `customer`; later profile saves never change the role. Then sign in (or reload) once
+   with the verified email: the Worker records the proof in `users.email_verified_at` (migration 0007).
+2. Copy the account's **uid** (Firebase console → Authentication → Users) and promote that uid in the **local**
+   database:
+   ```bash
+   node scripts/grant-admin.mjs --uid <uid> --email you@example.com --local
+   ```
+   The script changes the row only when that uid holds that email, the email was proven by a verified sign-in,
+   and exactly one row changes (`changes() = 1`); then it lists every admin row. Never promote with
+   `UPDATE users … WHERE email = …`: an address in D1 can sit on another uid's row, and that uid would become admin.
+3. Open `/admin`. The Worker allows access only when the token's email is verified, the row of that uid has role
+   `admin` and the same email, and the sign-in is at most 12 hours old (`worker/admin-auth.ts`). The browser has
+   no role logic.
+
+---
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | `vite`: the dev server with HMR, plus the Worker and D1 locally, on port 5173. |
+| `npm run lint` | `eslint .`: typescript-eslint, react-hooks and react-refresh rules. On 2026-09-24 it reported 0 errors and 0 warnings. |
+| `npm run build` | `tsc -b && vite build`: type-checks the app, node and worker projects, then writes `dist/client/` (static site) and `dist/sundus_yar_website/` (the Worker plus a generated `wrangler.json`). |
+| `npm run preview` | `vite preview`: serves the **built** output with the Worker (default port 4173). It uses the local D1 and applies `public/_headers`, so it is the closest local copy of production. |
+| `npx tsc -b` | Type-check only. |
+| `node scripts/optimize-images.mjs` | Regenerates the site photos and `src/data/site-images.ts`. See [photos](#how-to-swap-or-add-photos). |
+| `node scripts/make-brand-assets.mjs` | Regenerates the logo and icons. See [brand assets](#how-to-regenerate-the-brand-assets). |
+| `node scripts/grant-admin.mjs` | Grants (or with `--demote` removes) the admin role on one `users` row, by uid and verified email. See [making yourself admin](#run-locally). |
+| `node scripts/revoke-sessions.mjs` | Incident step: refuses every earlier sign-in of one uid. See [incident](#incident-a-stolen-password-or-session). |
+
+There is no automated test suite (`package.json` has no `test` script). Check behaviour by hand in
+`npm run dev` or `npm run preview`.
+
+---
+
+## Project structure
+
+```
+app/                              <- the git repository (this README)
+├─ index.html                     static <head>: lang="ar" dir="rtl", favicon, description, Open Graph
+├─ public/                        copied as-is into the build (file names are NOT hashed)
+│  ├─ _headers                    cache rules and noindex for /my-bookings and /admin
+│  ├─ robots.txt                  disallows /admin and /my-bookings
+│  └─ images/
+│     ├─ site/                    GENERATED photo variants (optimize-images.mjs)
+│     ├─ products/                GENERATED product photos (optimize-images.mjs)
+│     └─ brand/                   GENERATED logo and icons (make-brand-assets.mjs)
+├─ src/
+│  ├─ main.tsx                    mounts <AuthProvider><App/></AuthProvider>
+│  ├─ App.tsx                     the History-API router: 5 routes, lazy pages, error boundaries
+│  ├─ index.css                   imports the style layers in order (see Design tokens)
+│  ├─ styles/                     fonts.css → tokens.css → base.css → components.css → motion.css
+│  ├─ layout/                     header, footer, mobile menu, navigation, per-route <head> meta,
+│  │                              lazy loading, scroll handling, useReveal (scroll-entry motion), icons
+│  ├─ pages/                      HomePage + home/ sections, PortfolioPage + portfolio/Lightbox,
+│  │                              PackagesPage, sections/ContactSection (shared by Home and Portfolio)
+│  ├─ components/                 booking, account and admin widgets: PackageConfigurator, BookingCalendar,
+│  │                              AuthDialog, EmailVerificationGate, MyBookings, AdminDashboard,
+│  │                              BookingActions, BlockedDatesManager, ResponsiveImage
+│  ├─ auth/                       AuthProvider and useAuth (the one and only Firebase auth listener)
+│  ├─ api/                        fetch wrappers for /api/*
+│  ├─ lib/                        firebase.ts, whatsapp.ts, riyadh-calendar.ts
+│  └─ data/                       packages.ts (THE prices), site-images.ts (GENERATED), brand-images.ts
+├─ shared/                        code that BOTH the browser and the Worker import: booking validation and
+│                                 price calculation (booking.ts), statuses and actions (admin.ts), email types
+├─ worker/                        the Cloudflare Worker: routing, auth, bookings, profile, admin, email
+├─ migrations/                    D1 migrations 0001, 0003, 0004 (0002 was deleted on purpose, see Deploy)
+├─ scripts/                       optimize-images.mjs, make-brand-assets.mjs (Node + sharp)
+├─ wrangler.jsonc                 Worker name, assets config, D1 binding, FIREBASE_PROJECT_ID
+└─ worker-configuration.d.ts      generated by `wrangler types` (see Known issues)
+```
+
+**Folders outside the repository.** They sit next to `app/` on the owner's machine and are **not in git**, so back
+them up separately:
+
+```
+sundus-yar/
+├─ app/                           this repository
+├─ assets-incoming/               the owner's source photos (site-photos-7239/{16-9,3.2,4.5}/, contact-sheet.html)
+├─ assets-originals/              master logo brand-logo.jpeg, plus backups: products/, portfolio-legacy/
+└─ runs/redo-v2/                  planning documents, decisions.md, photo-catalogue.json
+```
+
+---
+
+## How to swap or add photos
+
+### How it works
+
+```
+../assets-incoming/site-photos-7239/<ratio>/<file>   the owner's pre-cropped photo
+                 +
+../runs/redo-v2/photo-catalogue.json                 slug, alt, category, order, slots
+                 │
+      node scripts/optimize-images.mjs
+                 │
+                 ├─> public/images/site/<slug>-<width>.avif / .webp   (480, 800, 1200 and native width; never upscaled)
+                 └─> src/data/site-images.ts                          (types, siteImages, portfolioOrder, slots, categories)
+```
+
+`src/data/site-images.ts` starts with `// AUTO-GENERATED FILE — do not hand-edit.` **Never edit it by hand.** Change
+the catalogue and run the script again. The script also records each photo's dominant colour as `placeholder`,
+which is the solid colour shown while the photo loads.
+
+### The catalogue (`../runs/redo-v2/photo-catalogue.json`)
+
+- `source_root` is the folder that the `file` paths are relative to. It is an **absolute Windows path**
+  (`C:/Users/azooz/Desktop/sundus-yar/assets-incoming/site-photos-7239`). Change it on any other machine.
+- `photos[]` lists the photos **in display order**. That order becomes `portfolioOrder`, so moving an entry moves
+  the photo on `/portfolio`. Fields:
+  - `file`: path under `source_root`, e.g. `"4.5/IMG_2845 (1) copy.webp"`.
+  - `ratio`: `"16:9"`, `"3:2"` or `"4:5"` only. Page layouts are built for these three ratios.
+  - `slug`: unique, lowercase ASCII with hyphens (e.g. `rings-satin`). It becomes the file name and the id.
+  - `alt`: Arabic. Describe **only what is visible**, in the pattern «لقطة [الوصف]، من أعمال المصورة سندس يار»
+    (`08-copy-ar.md` §2.1). Mention blurred faces when there are any.
+  - `category`: one of the `categories[].id` values (`details`, `hands`, `couple`, `moments`).
+  - `n` and `privacy` are notes for people. The script ignores them, but keep `privacy` accurate.
+- `slots` chooses the photos on the marketing pages:
+  - `hero`: one slug. The Home hero frame is portrait 4:5 (`src/pages/HomePage.css:69`), so use a 4:5 photo.
+  - `homeFeatured`: three slugs for the featured-work section on Home.
+  - `packagesBanner`: one slug. It fills a wide banner with `object-fit: cover`, so a landscape photo works best.
+- `categories` sets the `/portfolio` filter chips and their Arabic labels, in order. The UI adds «الكل» itself.
+
+### Privacy rule (check this before anything else)
+
+- **Never publish an identifiable bride's face.** Use detail shots (hands, rings, henna, dress, bouquet), shots from
+  behind, or photos where the owner has already pixelated the face.
+- A photo with a pixelated face goes in the portfolio grid **only**. Never use it in `hero`, `homeFeatured` or
+  `packagesBanner`; the catalogue marks these photos "grid only".
+- Publish only with the bride's consent («جميع الصور تُنشر بموافقة العروس»). By default, leave out any photo that
+  shows minors (decision D11).
+- **Camera metadata is stripped for you.** Every published size, including the full-size one, is re-encoded by
+  sharp, which writes no EXIF/XMP/IPTC (camera serials, capture date, owner name). Keep the originals you export
+  private anyway: `assets-incoming/` is outside the repo and is never served.
+
+### Swap a photo (replace one that is already on the site)
+
+1. Export the new photo cropped to 16:9, 3:2 or 4:5, without metadata. Make it at least 1200 px wide; the current
+   photos are 1600 to 1920 px wide. Save it under `../assets-incoming/site-photos-7239/<ratio folder>/`.
+2. In `photo-catalogue.json`, point the entry's `file` at the new file, update its `alt`, and **give it a new
+   `slug`**. If that slug is used in `slots`, change it there too.
+   *Why a new slug:* the script skips any output file whose width already matches, so reusing a slug would keep the
+   **old** photo. `public/_headers` also caches `/images/*` for 7 days, so returning visitors could still see the old
+   file. If you must keep the slug, delete `public/images/site/<slug>-*` before running the script.
+3. Run the pipeline from `app/`:
+   ```bash
+   node scripts/optimize-images.mjs
+   ```
+   It prints a report. A re-run with no changes prints `wrote 0 new variant(s)` and
+   `src/data/site-images.ts: unchanged`.
+4. Delete the old slug's files: `public/images/site/<old-slug>-*`. The script never deletes anything there.
+5. Run `npm run build`. TypeScript stops the build if a slot names a slug that does not exist, or if a `ratio` or
+   `category` is not allowed. Then look at `/`, `/portfolio` and `/packages` in `npm run dev`.
+6. Commit `public/images/site/` and `src/data/site-images.ts` together, and back up the catalogue, which is not in git.
+
+### Add, remove, reorder or recategorise
+
+- **Add:** put the file in `assets-incoming`, insert a new entry at the position you want in `photos[]`, then follow
+  steps 3, 5 and 6.
+- **Remove:** delete the entry (and any slot that uses it), run the script, then delete
+  `public/images/site/<slug>-*`.
+- **Reorder, change a category or alt text, or change slots:** edit the catalogue and run the script. It encodes
+  no new images; it only rewrites `site-images.ts`.
+
+Product photos (`catalogue.products`, output in `public/images/products/`) go through the same script. Only entries
+with `"publish": true` are processed. After processing, the raw originals are moved to `../assets-originals/products/`.
+
+---
+
+## How to regenerate the brand assets
+
+```bash
+node scripts/make-brand-assets.mjs
+```
+
+- Source: `../assets-originals/brand-logo.jpeg` (5000×3245, black calligraphy on white). It is outside the repo and
+  never served.
+- Output in `public/images/brand/`:
+  - `logo-ink-112` and `logo-ink-224` (`.webp` and `.png`): the logo in Ink colour `#241E1A` on a transparent background.
+  - `favicon-32.png`, `apple-touch-icon.png` and `icon-512.png`: the camera-aperture glyph on a Paper `#FAF6EF` background.
+- The output is deterministic: re-running it with the same master produces byte-identical files.
+- If you replace the master logo:
+  - Update the logo `width`/`height` values in `src/data/brand-images.ts` to the sizes the script prints.
+    That file is written by hand; today the sizes are 148×112 and 296×224.
+  - The aperture crop box (`APERTURE_CROP`) and mask radius in the script are measured in the **current** master's
+    pixels, so a new master needs them measured again.
+- `index.html` links `favicon-32.png` and `apple-touch-icon.png`, and `theme-color` is `#FFFCF7`.
+
+---
+
+## How to edit copy
+
+All copy is Arabic and is written inline in the component that shows it. There is no translation file. The source
+of truth for wording is `../runs/redo-v2/08-copy-ar.md`, and its **glossary is §10**.
+
+| What | Where |
+|---|---|
+| Page `<title>`, meta description and noindex for each route | `src/layout/route-meta.ts` |
+| First-paint `<head>` and social previews (description, `og:*`, `twitter:*`) | `index.html` |
+| Navigation labels (header and footer) | `src/layout/navigation.ts` |
+| Header, mobile menu, footer, sign-in button | `src/layout/SiteHeader.tsx`, `MobileMenu.tsx`, `SiteFooter.tsx`, `NavigationAuthControls.tsx` |
+| Home sections, in page order | `src/pages/home/HeroSection.tsx` → `StorySection.tsx` → `DifferenceSection.tsx` → `FeaturedWorkSection.tsx` → `ServicesSection.tsx` → `BookingStepsSection.tsx` → `TrustSection.tsx` → `FaqSection.tsx` → `src/pages/sections/ContactSection.tsx` |
+| Portfolio intro and filter | `src/pages/PortfolioPage.tsx`. Category labels come from the photo catalogue. |
+| Lightbox button labels | `src/pages/portfolio/Lightbox.tsx` |
+| Packages banner and intro | `src/pages/PackagesPage.tsx` |
+| Configurator, price summary, success screen | `src/components/PackageConfigurator.tsx` |
+| Option names (coverage, album sizes, prints…) | `src/data/packages.ts` (`label` fields). The Worker uses this file too; see [Prices](#prices). |
+| Calendar legend and weekday names | `src/components/BookingCalendar.tsx`, `src/lib/riyadh-calendar.ts` |
+| Sign-in, sign-up and email verification | `src/components/AuthDialog.tsx`, `EmailVerificationGate.tsx`, `src/auth/AuthContext.tsx` (error messages) |
+| My bookings | `src/components/MyBookings.tsx` |
+| Admin | `src/components/AdminDashboard.tsx`, `BookingActions.tsx`, `BlockedDatesManager.tsx` |
+| WhatsApp number and pre-filled messages | `src/lib/whatsapp.ts`. The number is also hard-coded in two more files; see [Known issues](#known-issues-as-of-2026-09-24). |
+| Instagram and TikTok (@sndsyar) | `src/layout/social-links.ts` |
+| Photo alt text | `photo-catalogue.json`, then re-run the image script |
+| Emails | `worker/email-templates.ts`. The existing templates and the Resend design are to be preserved (`08-copy-ar.md` §8.1). |
+| Error messages returned by the API | `worker/*.ts`, `shared/booking.ts` |
+| Loading and error states between pages | `src/layout/RouteFallback.tsx`, `RouteErrorBoundary.tsx` |
+
+**Writing rules (binding):**
+
+- Address the bride in the **feminine singular**, and write the kasra on the attached pronoun: طلبكِ، حجزكِ،
+  معكِ، يمكنكِ. Never use a masculine command such as «حاول».
+- System and operational text uses «نحن» (نراجع، سنؤكد). The only first-person «أنا» text is the story section
+  (`StorySection.tsx`, «أنا سندس»).
+- Use the glossary (§10): **الباقة/الباقات**, never «البكج»; **العرائس**, not «عرايس»; **العربون**;
+  **معرض الأعمال** (the public portfolio) is different from **معرض صوركِ** (a bride's private gallery);
+  **مصرّحة من وزارة العمل** exactly as written, never «مرخّصة» or «معتمدة».
+- Write prices, dates, counters and booking numbers in **Western digits** (`1 2 3`). When a number or a Latin handle
+  sits inside Arabic text, wrap it in `<bdi dir="ltr">` so the text direction does not reorder it.
+- **Never invent** testimonials, reviews, client names, awards, statistics or prices. Facts the owner has not yet
+  supplied are marked `[يُضاف من المالك]` in `08-copy-ar.md` §12. There is deliberately no testimonials section
+  (decision D7).
+- Write real Arabic, never placeholder text.
+
+---
+
+## Prices
+
+- Prices live **only** in `src/data/packages.ts`: coverage, album sizes and page counts, box upgrade, prints,
+  magazine and wooden enlargement.
+- The browser shows an **estimate**. The Worker **recomputes** the total with `shared/booking.ts`, which imports
+  `src/data/packages.ts`. `validateBookingSelection` checks that the chosen options exist in the current catalogue
+  and calculates the total. `worker/bookings.ts:684-707` saves the total the Worker computed. The client sends its
+  choices, never a price. **Never trust or store a total sent by the client**, and never add a request field that
+  carries a price.
+- Never type a price into copy. Read it from `packages.ts`, as `FaqSection.tsx` does with `coverageOptions`.
+- Each booking stores its own `package_snapshot` and `estimated_total` (`migrations/0001_initial.sql:54-59`).
+  Changing a price affects **new** requests only, and old snapshots stay valid.
+- Prices are a binding constraint ("Preserve: all prices"). Change them only when the owner says so. Then run
+  `npm run build` and deploy; the site and the Worker ship together in one deploy.
+
+---
+
+## Design tokens, CSS and motion
+
+**Decision D1:** plain CSS on one token system, with native motion only. That means no Tailwind, no CSS-in-JS, no
+animation library, and no CSS build step beyond Vite.
+
+- **Layer order** is set in `src/index.css`: `fonts.css` → `tokens.css` → `base.css` → `components.css` →
+  `motion.css`. Page and component CSS sits next to its component (e.g. `src/pages/HomePage.css`) and is imported by it.
+- **`src/styles/tokens.css`** holds every design value. Use the variable, never a raw value:
+  - Colours: five core colours (Paper `#FAF6EF`, Surface `#FFFCF7`, Ink `#241E1A`, Accent `#8A6A2E`,
+    Line `#8F8270`), their tints, and four semantic colours (success, warning, danger, info).
+  - Type: El Messiri for display and Cairo for text, on a fluid `clamp()` scale.
+  - Also: spacing on a 4 px base, radii (rounded rectangles are informational; full pills are interactive),
+    warm shadows, z-index, container widths, motion durations and easings, the focus ring, and a 44 px minimum
+    control height.
+  - The `.on-dark` class switches text and link colours for ink backgrounds (the contact band and the footer).
+- **Breakpoints** are `36rem`, `48rem`, `64rem` and `80rem`. Write them **literally** in `@media` rules, because
+  CSS variables do not work inside media queries.
+- The **LEGACY ALIASES** block at the end of `tokens.css` keeps older component CSS (admin, booking, auth) working.
+  Do not use those names in new code.
+- Use **logical properties** (`margin-inline`, `inset-inline`, `inline-size`…) so layouts stay correct in RTL.
+- Never show state by colour alone, and never remove the visible focus ring.
+- **Motion:**
+  - Scroll-entry reveal: `.reveal` in `motion.css`, driven by `src/layout/useReveal.ts`. Each element reveals once,
+    siblings are staggered (capped at 4 steps), and nothing already on screen is hidden.
+  - The Home hero photo zooms slowly with the `hero-zoom` keyframe (8 s).
+  - Hover effects apply only under `@media (hover: hover)`.
+  - `prefers-reduced-motion` is always honoured. `base.css` shortens all animation, and `motion.css` forces revealed
+    elements to be visible.
+  - Per D12, nothing bounces, spins or slides in from off-screen.
+- **Fonts** are self-hosted and limited to the three weights imported in `src/styles/fonts.css`. Adding a weight
+  adds download size, so don't add one casually.
+
+The full rationale, including contrast tables and component specs, is in `../runs/redo-v2/03-design-system.md`.
+
+---
+
+## Adding a route
+
+The router is hand-written, so a new page touches these files:
+
+1. `src/layout/navigation.ts`: add the path to `AppPath` and `isAppPath`, and add links if it needs them.
+2. `src/App.tsx`: add a `case` to the page switch.
+3. `src/layout/route-meta.ts`: add its title, description and `noindex` value.
+4. `src/layout/lazy-components.ts`: code-split it with `createRetryableLazy`. Nothing in the entry chunk may import
+   it statically.
+5. If the page is private: add it to `public/_headers` (`X-Robots-Tag`) and `public/robots.txt`.
+
+---
+
+## Deploy
+
+Deploying needs the owner's Cloudflare account. **Every production write needs the owner's explicit approval.**
+
+### 0. Before you start
+
+- `npm ci`, `npm run lint` and `npm run build` all pass.
+- The machine that builds has `.env.local` with the **production** Firebase values. `VITE_*` values are compiled
+  into the bundle at build time.
+
+### 1. Log in (the owner, herself)
+
+```bash
+npx wrangler login     # opens the browser; it stores only a local credential
+npx wrangler whoami    # confirm this is the account that owns sundus-yar-bookings
+```
+
+### 2. Check the production D1 state BEFORE any `migrations apply --remote`
+
+The production migration state is **unknown** (decision D8). The repository deleted
+`migrations/0002_create_booking_schema.sql` (commit `dfa1b4c`) because it was byte-identical to `0001` and broke
+fresh databases. The fix was checked locally (`../runs/redo-v2/d1/local-verification.md`). Production has not been
+checked yet. Follow `../runs/redo-v2/06-data-model.md`:
+
+1. **§2.3:** run the listed **read-only** commands in order, and save their output in `../runs/redo-v2/d1/`.
+   - Write down the Time Travel **bookmark** from
+     `npx wrangler d1 time-travel info sundus-yar-bookings`. It is the restore point for every later write.
+   - Do **not** start with `migrations list --remote`, because it creates wrangler's bookkeeping table if it is
+     missing (§2.1).
+   - Do **not** use `wrangler d1 export`, because it writes personal data to a local file.
+2. **§2.4:** match the state you found to a row (S0, S1, S2, S2b, S3, S4, S5 or S6). **STOP** rows mean stop and
+   escalate. The S3 row needs the §2.5 bookkeeping baseline first.
+3. Only when the table says so, and with the owner's approval:
+   ```bash
+   npx wrangler d1 migrations apply sundus-yar-bookings --remote
+   ```
+
+Rules:
+
+- Never add back or edit an applied migration.
+- Never delete rows from `d1_migrations`.
+- Never "create a new database" to get past a problem.
+
+### 3. Build and deploy
+
+This Worker reads `users.email_verified_at` and `users.tokens_valid_after`. **Apply migration
+`0007_users_email_verified_and_token_revocation.sql` (step 2) before deploying it**, or every signed-in request
+fails with 500. The migration only adds two nullable columns, so the Worker already deployed keeps working with it.
+
+```bash
+npm run build
+npx wrangler deploy
+```
+
+`npm run build` writes `dist/` and a redirect file (`.wrangler/deploy/config.json`) that points
+`wrangler deploy` at `dist/sundus_yar_website/wrangler.json`. **Always build immediately before you deploy**,
+otherwise you ship whatever is in `dist/`. `wrangler.jsonc` has no custom domain or routes, so the deploy goes to
+the `*.workers.dev` URL that wrangler prints.
+
+### 4. Email settings (names only; wrangler prompts for each value)
+
+```bash
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put EMAIL_FROM
+npx wrangler secret put APP_BASE_URL
+npx wrangler secret put ADMIN_NOTIFICATION_EMAIL
+npx wrangler secret put EMAIL_REPLY_TO      # optional
+npx wrangler secret list                     # shows names, never values
+```
+
+Only `RESEND_API_KEY` is truly secret. Storing the other four as secrets also keeps personal email addresses out
+of git. Anything under `vars` in `wrangler.jsonc` is committed and is overwritten on every deploy.
+`APP_BASE_URL` is the public origin, e.g. the workers.dev URL or the custom domain later.
+
+**Resend:**
+
+- Add the sending domain in the Resend dashboard, publish the DNS records Resend lists, and wait until the domain
+  shows as verified.
+- `EMAIL_FROM` must be an address on that domain.
+- Use an API key limited to sending.
+- Missing settings do **not** cause errors; emails are just skipped. Test by sending a real booking request and
+  checking that both the admin email and the customer email arrive.
+
+### 5. Firebase
+
+- In the Firebase console → Authentication → Settings → **Authorized domains**, add the production host (the
+  workers.dev host or the custom domain). The verification email links back to `<origin>/my-bookings`
+  (`src/auth/AuthContext.tsx:384-390`).
+- The Email/Password sign-in provider must be enabled.
+
+### 6. Smoke test
+
+- `https://<host>/api/health` returns `{"ok":true,…}`.
+- `/`, `/portfolio` and `/packages` render.
+- Sign-up, email verification and a test booking work.
+- `/admin` opens for the admin account.
+- The `/my-bookings` response carries `X-Robots-Tag: noindex, nofollow`.
+
+**Admin role in production:** the owner signs in once on the production site with her verified email and saves her
+profile. Then, with the uid from the Firebase console:
+
+```bash
+node scripts/grant-admin.mjs --uid <uid> --email <owner email> --remote
+```
+
+It is a production write, so the owner approves it and the Time Travel bookmark is recorded first. Never promote
+with an `UPDATE … WHERE email = …`. Receipts, galleries and media stay closed until `ADMIN_REQUIRE_MFA` is `"on"`
+(after the owner has enrolled TOTP), whatever `ONLINE_CONFIRMATION` says.
+
+#### Incident: a stolen password or session
+
+If an account's password, refresh token or ID token may be in someone else's hands, in this order:
+
+1. **Admin account only:** remove the role at once. It is the immediate kill switch for the admin API:
+   `node scripts/grant-admin.mjs --uid <uid> --email <email> --remote --demote`
+2. **In Firebase:** reset the account's password and revoke its refresh tokens (console, or the Admin SDK's
+   `revokeRefreshTokens`), so nobody can sign in again with the old password.
+3. **Then:** `node scripts/revoke-sessions.mjs --uid <uid> --remote`. It sets `users.tokens_valid_after` from D1's
+   clock. The Worker then refuses every token whose sign-in (`auth_time`) is older, including tokens that a stolen
+   refresh token mints later. If step 2 came after this script, run the script again.
+4. The owner signs in with the new password. For an admin, run `grant-admin.mjs` again (without `--demote`).
+
+Add `--env preview` to each command for the preview Worker's database.
+
+**When a custom domain is added:**
+
+- Update `APP_BASE_URL` and the Firebase authorized domains.
+- Consider adding `og:url`, `rel="canonical"` and an `og:image`. They are left out of `index.html` on purpose
+  until the domain and a checked 1200×630 image exist (the comment in `index.html` explains why).
+
+---
+
+## Security and privacy notes
+
+- **No secrets in `VITE_*`.** That prefix means "public".
+- **Secrets stay out of git.** Locally they live in `.dev.vars`; in production they are set with
+  `wrangler secret put`. `.gitignore` ignores `.dev.vars*`, `.env`, `.env.*` (except `.env.example`), `*.local`,
+  `.wrangler/` and `dist`.
+- **Authorisation happens on the server.**
+  - The Worker verifies the Firebase ID token (RS256; audience and issuer come from `FIREBASE_PROJECT_ID`).
+  - Customer queries are limited to the signed-in user.
+  - Admin routes also need a verified email, `users.role = 'admin'` on the row of that uid with the same email,
+    and a sign-in at most 12 hours old; with `ADMIN_REQUIRE_MFA` `"on"`, also a TOTP second factor.
+  - Never add role checks in the browser.
+- **Prices are recomputed by the Worker** (see [Prices](#prices)).
+- **Logging:** the Worker logs only fixed codes (e.g. `BOOKING_NOTIFICATION_FAILED`). Never log tokens, emails,
+  phone numbers or booking contents.
+- **Private pages** (`/my-bookings`, `/admin`) are kept out of search three ways: `public/_headers` sends
+  `X-Robots-Tag`, `robots.txt` disallows them, and `route-meta.ts` adds a robots meta tag.
+- **Photos:** follow the [privacy rule](#privacy-rule-check-this-before-anything-else). Bride photos and payment
+  receipts are sensitive personal data under the Saudi PDPL. Keep them private by default.
+- **Data location:** Firebase, Cloudflare D1 and Resend all store data outside the Kingdom.
+  `../runs/redo-v2/02-compliance.md` requires a **lawyer's review** before receipts (Run 4) or private galleries
+  (Run 6) go live. That document is drafting help and needs a named human's sign-off; it is not legal advice.
+
+---
+
+## Planning documents and open decisions
+
+Everything is in `../runs/redo-v2/`, which is outside the git repository:
+
+| File | Contents |
+|---|---|
+| `decisions.md` | **Read first.** Binding constraints, decisions D1–D12, red-team amendments R1–R9 |
+| `00-inspection-report.md` | Facts about the original code base (baseline) |
+| `01-product-spec.md` | Customer journey, user stories and MVP scope |
+| `02-compliance.md` | PDPL and e-commerce review (drafting help, needs sign-off) |
+| `03-design-system.md` | Palette, type, tokens, components, page layouts, photo plan |
+| `04-seo.md` | Meta, Open Graph, robots, structured-data plan |
+| `05-adr-architecture.md` | Architecture decisions. **It wins** where documents disagree. |
+| `06-data-model.md` | Schema, migration repair (§2), retention, the planned `0005` schema |
+| `07-api-contracts.md` | All current and planned endpoints |
+| `08-copy-ar.md` | Arabic copy deck and glossary (§10) |
+| `09-red-team.md` | Adversarial review (GO-WITH-FIXES) |
+| `photo-catalogue.json` | Input for the image pipeline |
+| `d1/local-verification.md` | Local proof of the migration fix |
+| `screenshots/run2/` | Run 2 screenshots |
+
+**Still open (2026-09-24):**
+
+- D4: deposit rule and bank details (OPEN).
+- D6: R2 photo storage (PROPOSED).
+- D7: real testimonials, which only the owner can supply (PROPOSED).
+- D8: production D1 state (UNKNOWN).
+- Runs 4 and 6 (receipts, private galleries) are gated on the lawyer's PDPL answer (U1), admin TOTP MFA (R1) and D4.
+- D5's timing defaults (for example, a 48-hour hold) are approved but **not yet in code**; the hold is 24 hours today.
+
+---
+
+## Known issues (as of 2026-09-24)
+
+These were observed in the code at `4bfb3b5` and have not been fixed yet.
+
+- **The WhatsApp number is in three places.** It is in `src/lib/whatsapp.ts`, and hard-coded again in
+  `src/components/PackageConfigurator.tsx:439` and `src/components/MyBookings.tsx:335`. If the number changes, change
+  all three.
+- **Fixed 2026-09-24: published photos no longer carry camera metadata.** The full-size variants used to be
+  byte-copies of the owner's files and kept EXIF/XMP (camera and lens serials, capture dates, and in two files a
+  camera-owner name). They are now re-encoded at high quality (AVIF q64 / WebP q86); a scan of all 273 served image
+  files found no EXIF, XMP or IPTC.
+- **Photo pipeline limits.** Reusing a slug does not refresh the image. `source_root` is an absolute path. The
+  script never deletes old outputs. See [Swap a photo](#swap-a-photo-replace-one-that-is-already-on-the-site).
+- **Comments point to files that do not exist.**
+  - `src/index.css`, `src/styles/tokens.css` and `src/styles/components.css` refer to `src/styles/README.md`, which
+    was never created. This README's [Design tokens](#design-tokens-css-and-motion) section is the map.
+  - Comments in `tokens.css`, `components.css` and `motion.css` still mention `legacy-public.css`, which was deleted
+    in `4bfb3b5`.
+- **«البكج» is still used** in `/my-bookings` and `/admin` (e.g. `MyBookings.tsx:245, 331, 359, 405` and
+  `AdminDashboard.tsx:254, 326, 557`). The glossary says «الباقة».
+- **`worker-configuration.d.ts` is out of date.** It was generated on 2026-08-19 and lists seven Firebase web-config
+  names (`apiKey` … `measurementId`, lines 7–13) as Worker env names, but the Worker never reads them. It is
+  regenerated with `npx wrangler types`; run `npm run build` afterwards to confirm the types still merge with
+  `worker/email-env.d.ts`.
+- **Some generated assets are unused.** The product images (`public/images/products/`, `productImages`) and
+  `icon-512.png` are generated, but no page references them yet.
+- **No custom domain and no automated tests.** See [Deploy](#deploy) and [Scripts](#scripts).

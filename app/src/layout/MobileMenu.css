@@ -1,0 +1,209 @@
+/* =============================================================================
+   Mobile menu — design-system §6.2. A sheet that slides in from the
+   reading-start edge (physically the RIGHT edge in this RTL app — the mirror
+   of an LTR menu that opens from the left) below the sticky header, with a
+   backdrop scrim. Hidden from 64rem, where the desktop nav takes over.
+   Tokens only; logical properties only (the one physical value is the
+   slide `translate`, which has no logical form — see the :dir() rules).
+   ========================================================================= */
+
+/* Page behind the open sheet does not scroll; the stable gutter prevents a
+   layout shift when the scrollbar disappears. */
+html.is-scroll-locked {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+.mobile-menu {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 64rem) {
+  .mobile-menu {
+    display: none;
+  }
+}
+
+/* ---- Toggle ---- */
+.mobile-menu__toggle {
+  display: inline-flex;
+  min-inline-size: var(--control-height);
+  min-block-size: var(--control-height);
+  padding-inline: var(--space-xs);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3xs);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .mobile-menu__toggle:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+/* Open state: icon switches to a cross AND the button fills (not colour alone). */
+.mobile-menu__toggle[aria-expanded="true"] {
+  border-color: var(--color-ink);
+  background: var(--color-paper-sunk);
+}
+
+.mobile-menu__toggle-icon {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+}
+
+/* ---- Scrim ---- */
+.mobile-menu__scrim {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset-block: var(--site-header-height) 0;
+  inset-inline: 0;
+  background: rgb(var(--shadow-ink) / 0.55);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-base) var(--ease-standard),
+    visibility 0s linear var(--duration-base);
+}
+
+.mobile-menu__scrim.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity var(--duration-base) var(--ease-standard),
+    visibility 0s linear 0s;
+}
+
+/* ---- Sheet ---- */
+.mobile-menu__panel {
+  position: fixed;
+  z-index: var(--z-dialog);
+  inset-block: var(--site-header-height) 0;
+  inset-inline-start: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  inline-size: min(22rem, 100%);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-block: var(--space-md) calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+  padding-inline: var(--page-gutter);
+  border-inline-end: 1px solid var(--color-hairline);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  visibility: hidden;
+  /* Off-screen past the inline-start edge: right in RTL … */
+  translate: 100% 0;
+  transition:
+    translate var(--duration-base) var(--ease-premium),
+    visibility 0s linear var(--duration-base);
+}
+
+/* … and left if the document is ever LTR. */
+.mobile-menu__panel:dir(ltr) {
+  translate: -100% 0;
+}
+
+.mobile-menu__panel.is-open {
+  visibility: visible;
+  translate: 0 0;
+  transition:
+    translate var(--duration-base) var(--ease-premium),
+    visibility 0s linear 0s;
+}
+
+/* ---- Links ---- */
+.mobile-menu__list {
+  display: grid;
+}
+
+.mobile-menu__link {
+  display: flex;
+  min-block-size: 3rem;
+  padding-inline: var(--space-sm);
+  align-items: center;
+  border-block-end: 1px solid var(--color-hairline);
+  border-inline-start: 3px solid transparent;
+  color: var(--color-ink-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-body-md);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .mobile-menu__link:hover {
+    color: var(--color-ink);
+    background: var(--color-paper);
+  }
+}
+
+/* Current page: accent bar on the start edge + ink text + tint (matches the
+   desktop underline indicator; never colour alone). */
+.mobile-menu__link[aria-current="page"] {
+  border-inline-start-color: var(--color-accent);
+  color: var(--color-ink);
+  background: var(--color-paper-sunk);
+}
+
+/* ---- Account ---- */
+.mobile-menu__auth {
+  display: grid;
+}
+
+/* ---- Social ---- */
+.mobile-menu__social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.mobile-menu__social-link {
+  display: inline-flex;
+  min-block-size: var(--control-height);
+  padding-inline: var(--space-sm);
+  align-items: center;
+  gap: var(--space-2xs);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-full);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .mobile-menu__social-link:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+.mobile-menu__social-icon {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  color: var(--color-accent);
+}
+
+/* ---- Primary CTA, pinned to the bottom of the sheet ---- */
+.mobile-menu__cta {
+  inline-size: 100%;
+  margin-block-start: auto;
+}

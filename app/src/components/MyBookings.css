@@ -1,0 +1,539 @@
+/* =============================================================================
+   حجوزاتي — the customer hub (design-system §5.5, ADR-001 W3-7 T3).
+   Tokens only (src/styles/tokens.css) and logical properties only, RTL-first.
+   Shared primitives come from components.css (.btn, .badge, .notice, .eyebrow,
+   .text-link); the journey kit (tracker, countdown, stage views) styles
+   itself in features/journey/journey.css. Every state is written out in text;
+   colour only reinforces it. Breakpoints: 36/48/64rem (tokens.css).
+   ========================================================================= */
+
+.my-bookings {
+  min-block-size: 100vh;
+  overflow-x: clip;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  font-family: var(--font-text);
+}
+
+/* Inside the public site shell the page only fills the space between the
+   shared header and footer. */
+.my-bookings--embedded {
+  min-block-size: 0;
+}
+
+.my-bookings__visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Stand-alone header and footer (not embedded) ---------- */
+.my-bookings__header {
+  border-block-end: 1px solid var(--color-hairline);
+  background: var(--color-surface);
+}
+
+.my-bookings__header-inner,
+.my-bookings__main,
+.my-bookings__footer {
+  inline-size: min(100% - (var(--page-gutter) * 2), var(--container-narrow));
+  margin-inline: auto;
+}
+
+.my-bookings__header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-block-size: 4.5rem;
+  padding-block: var(--space-sm);
+}
+
+.my-bookings__brand {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+}
+
+.my-bookings__brand-note {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.my-bookings__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-md);
+  border-block-start: 1px solid var(--color-hairline);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+/* ---------- Page ---------- */
+.my-bookings__main {
+  display: grid;
+  gap: var(--space-md);
+  padding-block: clamp(2rem, 6vw, 4rem) var(--section-space);
+}
+
+/* Programmatic focus target (the sign-in dialog returns focus here). */
+.my-bookings__main:focus {
+  outline: none;
+}
+
+.my-bookings__intro {
+  display: grid;
+  gap: var(--space-md);
+  padding-block-end: var(--space-md);
+  border-block-end: 1px solid var(--color-hairline);
+}
+
+.my-bookings__title {
+  margin-block-start: var(--space-2xs);
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  line-height: var(--leading-display);
+  font-weight: 600;
+}
+
+.my-bookings__lead {
+  max-inline-size: 36rem;
+  margin-block-start: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+}
+
+.my-bookings__identity {
+  display: grid;
+  gap: var(--space-3xs);
+  align-content: start;
+  min-inline-size: 0;
+  padding-inline-start: var(--space-sm);
+  border-inline-start: 2px solid var(--color-accent);
+  overflow-wrap: anywhere;
+}
+
+.my-bookings__identity span,
+.my-bookings__identity bdi {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__identity strong {
+  font-size: var(--text-body-md);
+  line-height: var(--leading-label);
+}
+
+@media (min-width: 36rem) {
+  .my-bookings__intro {
+    grid-template-columns: minmax(0, 1fr) minmax(10rem, auto);
+    align-items: end;
+  }
+}
+
+/* Empty until an action fails; keeps no space when it is empty. */
+.my-bookings__live:empty {
+  display: none;
+}
+
+/* ---------- Whole-page states: loading, signed out, errors, empty ---------- */
+.my-bookings__state {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-xs);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.my-bookings__state h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+}
+
+.my-bookings__state p {
+  max-inline-size: 34rem;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+.my-bookings__state-actions,
+.my-bookings__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-block-start: var(--space-2xs);
+}
+
+/* A still ring (the text beside it already says it is loading); it only
+   turns when reduced motion is not requested. */
+.my-bookings__spinner {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border: 3px solid var(--color-hairline);
+  border-block-start-color: var(--color-accent);
+  border-radius: var(--radius-full);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .my-bookings__spinner {
+    animation: my-bookings-spin 900ms linear infinite;
+  }
+}
+
+@keyframes my-bookings-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Inline notices (profile, refresh failure, skipped rows) ---------- */
+.my-bookings__notice {
+  margin: 0;
+}
+
+.my-bookings__notice-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2xs);
+  min-inline-size: 0;
+}
+
+.my-bookings__notice-title {
+  font-weight: 700;
+}
+
+/* ---------- Booking list ---------- */
+.my-bookings__content {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.my-bookings__section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.my-bookings__section-heading h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+}
+
+.my-bookings__section-heading p {
+  margin-block-start: var(--space-3xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__list {
+  display: grid;
+  gap: var(--space-md);
+}
+
+/* ---------- Booking card ---------- */
+.my-bookings__card {
+  display: grid;
+  gap: var(--space-sm);
+  min-inline-size: 0;
+  padding: clamp(1rem, 4vw, 1.75rem);
+  border: 1px solid var(--color-hairline);
+  border-inline-start: 4px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* The tone repeats the badge (which says it in words) as a third signal. */
+.my-bookings__card--info {
+  border-inline-start-color: var(--color-info);
+}
+
+.my-bookings__card--warning {
+  border-inline-start-color: var(--color-warning);
+}
+
+.my-bookings__card--success {
+  border-inline-start-color: var(--color-success);
+}
+
+.my-bookings__card--danger {
+  border-inline-start-color: var(--color-danger);
+}
+
+/* The booking a link named: moved to the top of the list and focused. */
+.my-bookings__card--selected {
+  border-color: var(--color-accent-soft);
+  box-shadow: var(--shadow-md);
+}
+
+.my-bookings__card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.my-bookings__card-heading {
+  display: grid;
+  gap: var(--space-3xs);
+  min-inline-size: 0;
+}
+
+.my-bookings__card-eyebrow {
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+}
+
+.my-bookings__card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+  scroll-margin-block-start: calc(var(--site-header-height, 4rem) + var(--space-sm));
+}
+
+.my-bookings__reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__reference-value {
+  min-inline-size: 0;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.my-bookings__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* «مسار سابق» (copy §4.1): a quiet caption beside the badge, not a status. */
+.my-bookings__legacy-tag {
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--space-3xs);
+  padding-inline: var(--space-2xs);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__summary {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding-block: var(--space-sm);
+  border-block: 1px solid var(--color-hairline);
+}
+
+.my-bookings__summary > div {
+  display: grid;
+  gap: var(--space-3xs);
+  min-inline-size: 0;
+}
+
+.my-bookings__summary dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@media (min-width: 36rem) {
+  .my-bookings__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.my-bookings__guidance {
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+.my-bookings__journey {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+/* ---------- Next step ---------- */
+.my-bookings__next {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2xs);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-sunk);
+}
+
+.my-bookings__next-title {
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+}
+
+.my-bookings__next-text {
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+/* ---------- Details (expanded on request) ---------- */
+.my-bookings__details {
+  display: grid;
+  gap: var(--space-sm);
+  padding-block-start: var(--space-sm);
+  border-block-start: 1px solid var(--color-hairline);
+}
+
+.my-bookings__detail-group {
+  min-inline-size: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.my-bookings__detail-group h4 {
+  margin-block-end: var(--space-xs);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-label);
+}
+
+.my-bookings__rows {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: 0;
+}
+
+.my-bookings__row,
+.my-bookings__extras li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3xs) var(--space-sm);
+  min-inline-size: 0;
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.my-bookings__row dt {
+  color: var(--color-ink-muted);
+}
+
+.my-bookings__row dd {
+  min-inline-size: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.my-bookings__row--total {
+  margin-block-start: var(--space-3xs);
+  padding-block-start: var(--space-2xs);
+  border-block-start: 1px solid var(--color-hairline);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+.my-bookings__row--total dt {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.my-bookings__extras {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.my-bookings__extras span {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.my-bookings__extras strong {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.my-bookings__muted {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+@media (min-width: 48rem) {
+  .my-bookings__details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Phones: actions stack to full width (44px targets) ---------- */
+@media (max-width: 35.99rem) {
+  .my-bookings__state-actions,
+  .my-bookings__card-actions,
+  .my-bookings__header-actions {
+    align-items: stretch;
+    flex-direction: column;
+    inline-size: 100%;
+  }
+
+  .my-bookings__section-heading > .btn,
+  .my-bookings__next > .btn {
+    inline-size: 100%;
+  }
+}

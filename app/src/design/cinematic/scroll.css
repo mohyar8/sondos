@@ -1,0 +1,217 @@
+/* =============================================================================
+   Cinematic scroll motion (12-motion-spec.md §3): E6 section-reveal tuning,
+   E7 photo wipes + tile settle, E8 scroll-driven parallax, and their print
+   rules. CSS on the existing markup and the existing reveal contract only —
+   src/styles/motion.css and src/layout/useReveal.ts are unchanged:
+
+     .reveal                     the visible resting state (CSS alone shows it)
+     .reveal.reveal--armed       useReveal adds it to below-the-fold elements
+                                 only, and only when motion is allowed
+     .reveal--armed.is-revealed  added once the element intersects, with
+                                 --reveal-index (0–4) for siblings that arrive
+                                 in the same batch
+
+   Every selector starts with `:root[data-design="cinematic"]` and sits at
+   specificity ≥ (0,3,0) — see hero.css for why. The entry guard
+   (`html[data-cine-entry="vt"]`, UX-09) is written as
+   `:where(:not([data-cine-entry="vt"]))`, zero specificity, so the print
+   rules at the end win by source order alone. Reduced motion: nothing here
+   applies; the classic contract's guarantees hold.
+   ========================================================================= */
+
+/* =====================================================================
+   E6 — Section reveal (existing contract, cinematic tuning)
+   ===================================================================== */
+
+/* Same contract, a longer rise: 22 px over 900 ms on `translate` (the
+   classic transform is cleared), siblings 90 ms apart. Specificity (0,4,0)
+   beats the classic (0,2,0) rules whatever order the stylesheets load in;
+   the revealed rule follows the armed one. Opacity 0 → 1 stays the classic
+   contract's declaration. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-design="cinematic"] .reveal.reveal--armed {
+    transform: none;
+    translate: 0 var(--cine-rise);
+    transition:
+      opacity var(--cine-dur-rise) var(--cine-ease-rise),
+      translate var(--cine-dur-rise) var(--cine-ease-rise);
+    transition-delay: calc(var(--reveal-index, 0) * var(--cine-stagger-item));
+  }
+
+  :root[data-design="cinematic"] .reveal--armed.is-revealed {
+    translate: 0 0;
+  }
+}
+
+/* =====================================================================
+   E7 — Photo wipes (featured strip, portfolio tiles) + tile settle (UX-10)
+   ===================================================================== */
+
+/* Featured strip: `.reveal` sits on the <ul>, so the strip itself stays put
+   (opacity 1, no rise) and its three tiles do the work — each is covered by
+   a veil in its own placeholder tone (inherited from the inline background)
+   that retreats toward the left on reveal, 120 ms apart. Portfolio: `.reveal`
+   sits on each <li>; the veil sits on the tile button and the photo settles
+   1.05 → 1 with the same stagger (`--reveal-index`).
+
+   No mount veils: the veil box exists only on an ARMED tile, i.e. one that
+   was below the fold when the page arrived. A tile useReveal never armed —
+   above the fold, or added by a category filter change — has no veil and no
+   settle, so a bride filtering quickly never sees colour blocks over the
+   photos. Veils are solid colour, never a crop: no face is revealed by
+   motion. The hover scale (`transform`) composes with the settle (`scale`),
+   and the veil is pointer-events: none, so tiles stay clickable during the
+   wipe. Inside a view transition none of this exists: the strip and the
+   tiles fall back to the E6 rise. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Each frame stacks its veil (z 1) above its photo without leaking that
+     level into the page. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-featured__list.reveal--armed .home-featured__item,
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .portfolio-grid__item.reveal--armed .portfolio-tile {
+    isolation: isolate;
+  }
+
+  /* The veil: full while waiting, wiped to 0 once revealed. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-featured__list.reveal--armed .home-featured__item::after,
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .portfolio-grid__item.reveal--armed .portfolio-tile::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    pointer-events: none;
+    background-color: inherit;
+    transform-origin: left center;
+    transform: scaleX(1);
+  }
+
+  /* The strip and the grid items themselves stay put: the veil is the
+     reveal. Same weight (0,4,0) as the E6 rules above, later in the file. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-featured__list.reveal--armed,
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .portfolio-grid__item.reveal--armed {
+    opacity: 1;
+    translate: 0 0;
+    transition: none;
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-featured__list.reveal--armed.is-revealed .home-featured__item::after {
+    transform: scaleX(0);
+    transition: transform var(--cine-dur-wipe) var(--cine-ease-glide);
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-featured__list.reveal--armed.is-revealed .home-featured__item:nth-child(2)::after {
+    transition-delay: var(--cine-stagger-tile);
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-featured__list.reveal--armed.is-revealed .home-featured__item:nth-child(3)::after {
+    transition-delay: calc(2 * var(--cine-stagger-tile));
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .portfolio-grid__item.reveal--armed.is-revealed .portfolio-tile::after {
+    transform: scaleX(0);
+    transition: transform var(--cine-dur-wipe) var(--cine-ease-glide) calc(var(--reveal-index, 0) * var(--cine-stagger-tile));
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .portfolio-grid__item.reveal--armed.is-revealed .portfolio-tile__image {
+    animation: cine-settle-tile var(--cine-dur-settle-tile) var(--cine-ease-settle) calc(var(--reveal-index, 0) * var(--cine-stagger-tile)) both;
+  }
+}
+
+/* =====================================================================
+   E8 — Scroll-driven parallax (photos only)
+   ===================================================================== */
+
+/* Runs on the compositor with no scroll listener. The <picture> — not the
+   <img>, which carries the settle on `scale` — becomes the frame's absolute
+   layer: featured tiles drift −4% → +4% while crossing the viewport inside a
+   1.10 overscan, so no edge ever shows; the hero and the packages banner are
+   framed at rest and only drift down 6% (growing to 1.12) while leaving.
+   The frames keep their aspect-ratio / block-size, so the layout does not
+   change (no CLS). Firefox and older engines fail the @supports test and
+   keep static photos; on phones the featured tiles sit inside a horizontal
+   scroller, so their view(block) timeline is inactive and they stay static
+   too. Never text, never the header. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-design="cinematic"] :is(.home-hero__media, .home-featured__item, .packages-banner) > picture {
+      position: absolute;
+      inset: 0;
+      display: block;
+    }
+
+    /* Under the banner's ink scrim (::after, z -1). */
+    :root[data-design="cinematic"] .packages-banner > picture {
+      z-index: -2;
+    }
+
+    /* The shorthand comes first: it resets animation-timeline. */
+    :root[data-design="cinematic"] .home-featured__item > picture {
+      animation: cine-parallax linear both;
+      animation-timeline: view(block);
+      animation-range: cover 0% cover 100%;
+    }
+
+    :root[data-design="cinematic"] :is(.home-hero__media, .packages-banner) > picture {
+      animation: cine-parallax-exit linear both;
+      animation-timeline: view(block);
+      animation-range: exit 0% exit 100%;
+    }
+  }
+}
+
+/* =====================================================================
+   Keyframes — compositor properties only (§2 token rule 1)
+   ===================================================================== */
+@keyframes cine-settle-tile {
+  from {
+    scale: var(--cine-tile-settle-from);
+  }
+
+  to {
+    scale: 1;
+  }
+}
+
+@keyframes cine-parallax {
+  from {
+    translate: 0 calc(var(--cine-parallax-shift) * -1);
+    scale: var(--cine-parallax-overscan);
+  }
+
+  to {
+    translate: 0 var(--cine-parallax-shift);
+    scale: var(--cine-parallax-overscan);
+  }
+}
+
+@keyframes cine-parallax-exit {
+  from {
+    translate: 0 0;
+    scale: 1;
+  }
+
+  to {
+    translate: 0 var(--cine-exit-shift);
+    scale: var(--cine-exit-overscan);
+  }
+}
+
+/* =====================================================================
+   Print — every armed element visible, no veil box, no tile settle. Same
+   selectors as the rules above, later in the file (plus the per-page classic
+   print rules, which keep opacity 1 / transform none).
+   ===================================================================== */
+@media print {
+  :root[data-design="cinematic"] .reveal.reveal--armed {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  :root[data-design="cinematic"] .home-featured__list.reveal--armed .home-featured__item::after,
+  :root[data-design="cinematic"] .portfolio-grid__item.reveal--armed .portfolio-tile::after {
+    content: none;
+  }
+
+  :root[data-design="cinematic"] .portfolio-grid__item.reveal--armed.is-revealed .portfolio-tile__image {
+    animation: none;
+  }
+}

@@ -1,0 +1,191 @@
+/* =============================================================================
+   Portfolio lightbox — design-system §4.10 and decision D12: a smooth,
+   full-screen viewer on the ink background. Opening and changing photos only
+   fade (nothing slides, bounces or spins), and even the fade is off under
+   prefers-reduced-motion. Logical properties only; the one physical rule is
+   the chevron mirror for an LTR context.
+   ========================================================================= */
+
+/* The page behind the open viewer does not scroll; the stable gutter keeps
+   the layout from shifting when the scrollbar disappears. */
+html.has-open-lightbox {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* A native <dialog> shown with showModal(): the UA centres a fit-content box,
+   so every size, margin and border default is reset here. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  max-inline-size: none;
+  max-block-size: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  color: var(--color-paper);
+  background: var(--color-ink);
+}
+
+/* Set on [open] only: a display value on the bare selector would override
+   the UA's `dialog:not([open]) { display: none }`. */
+.lightbox[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.lightbox::backdrop {
+  background: rgb(var(--shadow-ink) / 0.9);
+}
+
+/* ---------- Top bar: close ---------- */
+.lightbox__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-block: max(var(--space-2xs), env(safe-area-inset-top));
+  padding-inline: var(--page-gutter);
+}
+
+/* Round icon buttons: close, previous, next. The visible name is in a
+   visually hidden span; the icon is aria-hidden. */
+.lightbox__button {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--control-height);
+  block-size: var(--control-height);
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-paper) 40%, transparent);
+  border-radius: var(--radius-full);
+  color: var(--color-paper);
+  background: rgb(var(--shadow-ink) / 0.6);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .lightbox__button:hover {
+    border-color: var(--color-accent-soft);
+    background: rgb(var(--shadow-ink) / 0.85);
+  }
+}
+
+/* ---------- Stage: the photo, fitted inside at its native ratio ---------- */
+
+/* A size container: the figure's inline style reads 100cqi/100cqb to fit the
+   photo inside this box without cropping it. */
+.lightbox__stage {
+  position: relative;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-block-size: 0;
+  padding-inline: var(--space-2xs);
+  /* Vertical panning and pinch zoom stay with the browser; horizontal
+     swipes reach the pointer handlers. */
+  touch-action: pan-y pinch-zoom;
+}
+
+.lightbox__figure {
+  position: relative;
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.lightbox__image {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+.lightbox__nav {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+}
+
+.lightbox__nav--previous {
+  inset-inline-start: var(--space-2xs);
+}
+
+.lightbox__nav--next {
+  inset-inline-end: var(--space-2xs);
+}
+
+/* Chevrons are drawn for RTL; mirror them when the context is LTR. */
+.lightbox__chevron:dir(ltr) {
+  transform: scaleX(-1);
+}
+
+/* ---------- Bottom: counter and caption ---------- */
+.lightbox__details {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+  padding-block: var(--space-xs) max(var(--space-sm), env(safe-area-inset-bottom));
+  padding-inline: var(--page-gutter);
+  text-align: center;
+}
+
+.lightbox__counter {
+  color: var(--color-paper);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.lightbox__caption {
+  max-inline-size: 48rem;
+  color: var(--color-ink-on-dark-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+/* From tablets up the arrows sit beside the photo instead of over it. */
+@media (min-width: 48rem) {
+  .lightbox__stage {
+    padding-inline: calc(var(--control-height) + var(--space-lg));
+  }
+
+  .lightbox__nav--previous {
+    inset-inline-start: var(--space-sm);
+  }
+
+  .lightbox__nav--next {
+    inset-inline-end: var(--space-sm);
+  }
+}
+
+/* ---------- Motion: fades only, and none under reduced motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .lightbox[open],
+  .lightbox[open]::backdrop {
+    animation: lightbox-fade-in var(--duration-base) var(--ease-decelerate);
+  }
+
+  .lightbox__figure {
+    animation: lightbox-fade-in var(--duration-slow) var(--ease-decelerate);
+  }
+}
+
+@keyframes lightbox-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,218 @@
+/* =============================================================================
+   EmailVerificationGate — on the shared token/component system
+   (runs/redo-v2/03-design-system.md §4.1 buttons, §4.3 cards, §4.7 notices,
+   §3.2 motion). The card, buttons, eyebrow and notices reuse
+   styles/components.css (.card, .btn, .eyebrow, .notice); this file only adds
+   the full-screen layout that covers the (inert) site behind the gate.
+   ========================================================================= */
+
+.email-verification {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset: 0;
+  display: grid;
+  min-inline-size: 0;
+  padding: var(--page-gutter);
+  padding-block-end: calc(var(--page-gutter) + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+/* `margin: auto` centres the card in the single grid cell, and — unlike
+   `place-items: center` — never pushes the top of a tall card out of the
+   scrollable area on a short screen. */
+.email-verification__card {
+  inline-size: min(100%, 40rem);
+  min-inline-size: 0;
+  margin: auto;
+}
+
+.email-verification__brand {
+  font-family: var(--font-display);
+  font-size: var(--text-body-lg);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.email-verification__eyebrow {
+  margin-block-start: var(--space-md);
+}
+
+.email-verification__title {
+  margin-block-start: var(--space-2xs);
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  font-weight: 600;
+  line-height: var(--leading-display);
+}
+
+.email-verification__description {
+  margin-block-start: var(--space-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-lg);
+}
+
+/* Registered address — informational, so a rounded rect with the accent
+   start border (the same shape language as notices). */
+.email-verification__email {
+  display: grid;
+  min-inline-size: 0;
+  margin-block-start: var(--space-md);
+  padding: var(--space-sm);
+  gap: var(--space-3xs);
+  border-inline-start: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-sunk);
+}
+
+.email-verification__email-label {
+  color: var(--color-ink-muted);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+}
+
+.email-verification__email-value {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-body-lg);
+  font-weight: 700;
+  unicode-bidi: isolate;
+}
+
+.email-verification__instructions {
+  margin-block-start: var(--space-md);
+}
+
+.email-verification__instructions h2 {
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+}
+
+.email-verification__instructions ul {
+  display: grid;
+  margin-block-start: var(--space-2xs);
+  padding-inline-start: var(--space-md);
+  gap: var(--space-3xs);
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body-md);
+  list-style: disc;
+}
+
+.email-verification__instructions li::marker {
+  color: var(--color-accent);
+}
+
+.email-verification__wrong-email {
+  margin-block-start: var(--space-md);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+/* ---------- Feedback (§4.7): ink text on a tint, semantic icon and start
+   border — never colour alone. The two live regions stay mounted and are
+   empty (no box, no spacing) until a message arrives. ---------- */
+.email-verification__feedback .notice {
+  margin-block-start: var(--space-md);
+}
+
+.email-verification__feedback .notice > p {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.email-verification__feedback .notice__icon {
+  margin-block-start: 0.1em;
+}
+
+.email-verification__feedback .notice--info .notice__icon {
+  color: var(--color-info);
+}
+
+.email-verification__feedback .notice--success .notice__icon {
+  color: var(--color-success);
+}
+
+.email-verification__feedback .notice--danger .notice__icon {
+  color: var(--color-danger);
+}
+
+.email-verification__retry {
+  inline-size: 100%;
+  margin-block-start: var(--space-xs);
+}
+
+/* ---------- Actions ---------- */
+.email-verification__actions {
+  display: grid;
+  margin-block-start: var(--space-md);
+  gap: var(--space-2xs);
+}
+
+@media (min-width: 36rem) {
+  .email-verification__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .email-verification__sign-out {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- Support ---------- */
+.email-verification__support {
+  margin-block-start: var(--space-md);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-md);
+  text-align: center;
+}
+
+/* Inline link (§4.2): the underline is the signal, colour is secondary. */
+.email-verification__support-link {
+  border-block-end: 1px solid var(--color-line);
+  color: var(--color-ink);
+  font-weight: 700;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .email-verification__support-link:hover {
+    border-block-end-color: var(--color-accent);
+  }
+}
+
+.email-verification__visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Motion (§3.2): a quiet entry for the card — fade + 12px rise,
+   only without a reduced-motion preference (otherwise a static card). ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .email-verification__card {
+    animation: email-verification-enter var(--duration-slow) var(--ease-decelerate);
+  }
+}
+
+@keyframes email-verification-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

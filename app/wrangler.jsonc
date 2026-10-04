@@ -1,0 +1,249 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sundus-yar-website",
+  // The deploying account (runs/redo-v2/release/w0-inventory.md), so a
+  // wrangler login to any other account cannot deploy this Worker there.
+  "account_id": "52c34fa9a7afb30c9db795d42b13df68",
+  "compatibility_date": "2026-08-19",
+  "main": "./worker/index.ts",
+  // No version Preview URLs (audit SEC-13): each old version would otherwise
+  // stay callable at <version>-<name>.<subdomain>.workers.dev, running that
+  // version's (possibly unfixed) code against this environment's database.
+  // Also switch them off in the dashboard (Settings > Domains & Routes).
+  "preview_urls": false,
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "triggers": {
+    "crons": ["*/15 * * * *", "0 0 * * *"]
+  },
+  // Vars are typed by the generated worker-configuration.d.ts only: after
+  // changing a var or binding here, run `npx wrangler types --strict-vars=false`
+  // with no .dev.vars* file present (its names would leak into the types).
+  // Every flag is compared as an exact string (worker/portal/gates.ts,
+  // worker/recent-auth.ts), so a missing or misspelt value never opens
+  // private media: ONLINE_CONFIRMATION is on only when exactly "on", and
+  // ADMIN_MEDIA_MFA drops the second factor only when exactly "off".
+  "vars": {
+    // Online confirmation (owner decision, plan 11 §1.3 D12): on, and still
+    // self-gated by the admin settings and the kill switch in D1.
+    "ONLINE_CONFIRMATION": "on",
+    // The new production Firebase project (decision D16) does not exist yet.
+    // This placeholder cannot be a real project id (upper case and
+    // underscores), so no ID token can match it and every sign-in is refused
+    // until W7-01 writes the real id here.
+    "FIREBASE_PROJECT_ID": "PLACEHOLDER_PRODUCTION_FIREBASE_PROJECT_ID",
+    // Private-media admin routes need a TOTP second factor unless this is
+    // exactly "off"; "off" also keeps receipts, galleries and media closed
+    // (gates.ts ADMIN_MFA_DISABLED). The release preflight refuses "off".
+    "ADMIN_MEDIA_MFA": "required",
+    // "required" makes bank, contact, deposit and terms writes need a second
+    // factor. Keep "off" until the owner has enrolled TOTP, or the only admin
+    // is locked out of the settings.
+    "ADMIN_SETTINGS_2F": "off"
+  },
+  // Production starts on a new, empty D1 (decision D19c), created
+  // 2026-10-01 in this account with location hint eeur.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sundus-yar-production",
+      "database_id": "3e8d75cc-fb15-4a69-9461-63c69859f5c1"
+    }
+  ],
+  // Burst limits per 60 seconds (plan 11 §3.1, audit SEC-03; the binding
+  // allows periods of 10 or 60 seconds only), keyed by the Firebase uid, or
+  // the connecting IP on public routes, in worker/rate-limit.ts. Longer
+  // windows are SQL caps inside the writing statements, which stay the hard
+  // bound: without a binding the check allows the request.
+  // namespace_id is an account-unique positive integer chosen here, not a
+  // resource to create: Workers that share one share its counters, so
+  // production uses 1001-1007, the preview 2001-2007 and the local-only
+  // mediatest 3001-3007. ratelimits is not inherited: each env repeats it.
+  "ratelimits": [
+    {
+      "name": "RL_BOOKING",
+      "namespace_id": "1001",
+      "simple": { "limit": 3, "period": 60 }
+    },
+    {
+      "name": "RL_PROFILE",
+      "namespace_id": "1002",
+      "simple": { "limit": 3, "period": 60 }
+    },
+    {
+      "name": "RL_CUSTOMER_WRITE",
+      "namespace_id": "1003",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "RL_UPLOAD",
+      "namespace_id": "1004",
+      "simple": { "limit": 2, "period": 60 }
+    },
+    {
+      "name": "RL_AVAILABILITY",
+      "namespace_id": "1005",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "RL_CSP_REPORT",
+      "namespace_id": "1006",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "RL_ADMIN_READ",
+      "namespace_id": "1007",
+      "simple": { "limit": 100, "period": 60 }
+    }
+  ],
+  // No r2_buckets here or in env.preview: private media ships closed
+  // (decision D17), and the release preflight refuses a build that has one.
+  "env": {
+    // Preview for the owner and the photographer to review before launch
+    // (built with CLOUDFLARE_ENV=preview). Its own database, no scheduled
+    // jobs, never the production data or the production Firebase project: it
+    // uses the dev project (TM-24), whose id replaces the placeholder once the
+    // owner has created it (W5-05). Browse-only (audit SEC-08):
+    // PREVIEW_READ_ONLY "on" makes the Worker answer 403 PREVIEW_READ_ONLY to
+    // every /api request it does not list as a public read (worker/index.ts),
+    // and online confirmation is off there. Its noindex header comes from
+    // public/_headers (a rule for this Worker's workers.dev host), so every
+    // rebuild keeps it. Put the host behind Cloudflare Access, and run
+    // `wrangler delete --env preview` when the review is over.
+    "preview": {
+      "name": "sundus-yar-preview",
+      "preview_urls": false,
+      "triggers": {
+        "crons": []
+      },
+      "vars": {
+        "ONLINE_CONFIRMATION": "off",
+        "FIREBASE_PROJECT_ID": "PLACEHOLDER_DEV_FIREBASE_PROJECT_ID",
+        "ADMIN_MEDIA_MFA": "required",
+        "ADMIN_SETTINGS_2F": "off",
+        "PREVIEW_READ_ONLY": "on"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "sundus-yar-preview",
+          "database_id": "8349c6ba-3cb9-4644-a4f5-220193b8d639"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "RL_BOOKING",
+          "namespace_id": "2001",
+          "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "RL_PROFILE",
+          "namespace_id": "2002",
+          "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "RL_CUSTOMER_WRITE",
+          "namespace_id": "2003",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "RL_UPLOAD",
+          "namespace_id": "2004",
+          "simple": { "limit": 2, "period": 60 }
+        },
+        {
+          "name": "RL_AVAILABILITY",
+          "namespace_id": "2005",
+          "simple": { "limit": 60, "period": 60 }
+        },
+        {
+          "name": "RL_CSP_REPORT",
+          "namespace_id": "2006",
+          "simple": { "limit": 30, "period": 60 }
+        },
+        {
+          "name": "RL_ADMIN_READ",
+          "namespace_id": "2007",
+          "simple": { "limit": 100, "period": 60 }
+        }
+      ]
+    },
+    // Local only, for building and testing private media (Train B):
+    // CLOUDFLARE_ENV=mediatest npm run dev, with PDPL_SIGNOFF_REF,
+    // MEDIA_SIGNING_KEY and FIREBASE_PROJECT_ID in .dev.vars.mediatest
+    // (never committed). ADMIN_MEDIA_MFA "off" closes private media here
+    // too, so admin media flows need a tester admin with TOTP enrolled in
+    // the dev project. Never deployed: the all-zero account id below
+    // matches no Cloudflare account (and wins over CLOUDFLARE_ACCOUNT_ID),
+    // so the API refuses every remote command for this env (deploy, d1
+    // --remote) and wrangler can create nothing. A missing R2 bucket is no
+    // barrier: `wrangler deploy` creates a bucket it cannot find. The D1 id
+    // is a placeholder too, and the release preflight refuses any
+    // r2_buckets. Local dev and `--local` D1 never read the account id. Its
+    // local D1 is separate: migrate it with `--env mediatest`.
+    "mediatest": {
+      "name": "sundus-yar-mediatest",
+      "account_id": "00000000000000000000000000000000",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "ONLINE_CONFIRMATION": "on",
+        "FIREBASE_PROJECT_ID": "PLACEHOLDER_DEV_FIREBASE_PROJECT_ID",
+        "ADMIN_MEDIA_MFA": "required",
+        "ADMIN_SETTINGS_2F": "off"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "sundus-yar-mediatest",
+          "database_id": "00000000-0000-0000-0000-00000000000e"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "sundus-yar-mediatest-local"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "RL_BOOKING",
+          "namespace_id": "3001",
+          "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "RL_PROFILE",
+          "namespace_id": "3002",
+          "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "RL_CUSTOMER_WRITE",
+          "namespace_id": "3003",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "RL_UPLOAD",
+          "namespace_id": "3004",
+          "simple": { "limit": 2, "period": 60 }
+        },
+        {
+          "name": "RL_AVAILABILITY",
+          "namespace_id": "3005",
+          "simple": { "limit": 60, "period": 60 }
+        },
+        {
+          "name": "RL_CSP_REPORT",
+          "namespace_id": "3006",
+          "simple": { "limit": 30, "period": 60 }
+        },
+        {
+          "name": "RL_ADMIN_READ",
+          "namespace_id": "3007",
+          "simple": { "limit": 100, "period": 60 }
+        }
+      ]
+    }
+  }
+}

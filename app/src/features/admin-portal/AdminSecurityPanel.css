@@ -1,0 +1,128 @@
+/* =============================================================================
+   AdminSecurityPanel — authenticator-app (TOTP) enrollment for the admin.
+   Chrome comes from AdminDashboard.css (.admin-panel, .admin-section-heading,
+   .admin-notice) and styles/components.css (.field, .input, .btn, .notice);
+   this file only lays out the steps and the copyable key and link.
+   ========================================================================= */
+
+.admin-security {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-security .admin-section-heading {
+  margin-block-end: 0;
+}
+
+.admin-security__lead {
+  max-inline-size: 60ch;
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body-md);
+}
+
+.admin-security__intro,
+.admin-security__status {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-sm);
+}
+
+.admin-security__factors {
+  display: grid;
+  gap: var(--space-3xs);
+  padding-inline-start: var(--space-md);
+  list-style: disc;
+}
+
+.admin-security__enrollment {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-security__steps-title {
+  font-family: var(--font-display);
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+}
+
+.admin-security__steps-title:focus {
+  outline: none;
+}
+
+.admin-security__steps-title:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.admin-security__steps {
+  display: grid;
+  gap: var(--space-md);
+  padding-inline-start: var(--space-lg);
+  line-height: var(--leading-body-md);
+  list-style: decimal;
+}
+
+/* Stays a list item, so the step number shows; spacing via margins. */
+.admin-security__steps > li {
+  min-inline-size: 0;
+}
+
+.admin-security__steps > li > * + * {
+  margin-block-start: var(--space-xs);
+}
+
+.admin-security__app-name {
+  white-space: nowrap;
+}
+
+.admin-security__secret {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3xs);
+  min-inline-size: 0;
+}
+
+/* The key and the link are left-to-right tokens inside Arabic text. The key
+   wraps between its groups of four; the long otpauth link wraps anywhere,
+   so neither widens the page on a phone. */
+.admin-security__code {
+  display: block;
+  max-inline-size: 100%;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-sunk);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-body-md);
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.admin-security__code--url {
+  font-size: var(--text-body-sm);
+  letter-spacing: 0;
+  word-break: break-all;
+}
+
+.admin-security__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.admin-security__form {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.admin-security__form .field {
+  margin-block-end: 0;
+}
+
+.admin-security__code-input {
+  max-inline-size: 12rem;
+  letter-spacing: 0.2em;
+  text-align: center;
+}

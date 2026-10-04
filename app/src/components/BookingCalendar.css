@@ -1,0 +1,423 @@
+/* =============================================================================
+   Booking calendar — design-system §4.13 (day states, never colour-only),
+   §4.7 notices (global .notice), §4.1 buttons (global .btn), §3.2 motion.
+   Tokens only (src/styles/tokens.css); logical properties only (RTL first).
+   Every state carries a non-colour signal, repeated in the legend:
+     selected    → accent fill + check mark under the number
+     pending     → warning tint + asterisk mark under the number
+     unavailable → sunk fill + strikethrough on the number
+     past        → sunk fill, no border, regular weight (no strike: a
+                   different meaning from "unavailable", a different mark)
+     beyond      → sunk fill, dotted border: after the booking horizon
+                   (shared/timing.ts BOOKING_HORIZON_DAYS)
+     today       → 2px ink ring inside the cell + «اليوم» under the number
+     unverified  → dashed border while availability is loading / failed
+   plus visually-hidden Arabic text per cell (the full accessible name).
+   ========================================================================= */
+
+.booking-calendar {
+  --booking-calendar-gap: clamp(0.125rem, 0.6vw, var(--space-2xs));
+  /* Narrow inline padding on phones so 7 columns keep ~44px-wide days */
+  --booking-calendar-padding-inline: clamp(
+    var(--space-2xs),
+    2.5vw,
+    var(--space-lg)
+  );
+
+  min-width: 0;
+  padding-block: var(--space-md);
+  padding-inline: var(--booking-calendar-padding-inline);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-family: var(--font-text);
+}
+
+@media (min-width: 64rem) {
+  .booking-calendar {
+    padding: var(--space-lg);
+  }
+}
+
+/* ---------- Introduction ---------- */
+.booking-calendar__introduction {
+  max-width: 42rem;
+}
+
+.booking-calendar__eyebrow {
+  margin: 0;
+}
+
+.booking-calendar__introduction h3 {
+  margin-block-start: var(--space-3xs);
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.booking-calendar__introduction > p:not(.eyebrow) {
+  margin-block-start: var(--space-2xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+/* ---------- Month navigation ---------- */
+.booking-calendar__navigation {
+  display: grid;
+  margin-block-start: var(--space-md);
+  grid-template-columns: minmax(0, auto) minmax(7rem, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.booking-calendar__month {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-heading-sm);
+  font-weight: 700;
+  line-height: var(--leading-heading);
+  text-align: center;
+}
+
+.booking-calendar__nav-button {
+  padding-inline: var(--space-sm);
+}
+
+/* ---------- Load state ---------- */
+.booking-calendar__load-state {
+  min-height: var(--space-xl);
+  margin-block-start: var(--space-xs);
+}
+
+.booking-calendar__loading {
+  padding-block: var(--space-2xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.booking-calendar__error .notice__icon {
+  color: var(--color-danger);
+}
+
+.booking-calendar__error-body {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2xs);
+}
+
+/* ---------- Grid ---------- */
+.booking-calendar__grid {
+  display: flex;
+  margin-block-start: var(--space-2xs);
+  flex-direction: column;
+  gap: var(--booking-calendar-gap);
+}
+
+.booking-calendar__row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--booking-calendar-gap);
+}
+
+.booking-calendar__row:first-child {
+  padding-block-end: var(--space-2xs);
+  border-block-end: 1px solid var(--color-hairline);
+}
+
+.booking-calendar__weekday {
+  min-width: 0;
+  color: var(--color-ink-muted);
+  font-size: clamp(0.62rem, 2vw, 0.78rem);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.booking-calendar__empty-day {
+  min-height: calc(var(--control-height) + var(--space-2xs));
+}
+
+/* ---------- Day cell (also the legend swatch, via --swatch) ---------- */
+.booking-calendar__day {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: calc(var(--control-height) + var(--space-2xs));
+  margin: 0;
+  padding-block: var(--space-3xs);
+  padding-inline: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  cursor: pointer;
+  /* §3.2: calendar selection animates colour only — no bounce, no scale */
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+/* Lift the focused cell so its ring (base.css :focus-visible) is never
+   painted under a neighbouring cell. */
+.booking-calendar__day:focus-visible {
+  z-index: 1;
+}
+
+.booking-calendar__day-number {
+  line-height: 1;
+}
+
+.booking-calendar__day-marks {
+  display: flex;
+  min-height: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1px var(--space-3xs);
+}
+
+.booking-calendar__mark {
+  flex: 0 0 auto;
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.booking-calendar__mark--pending {
+  color: var(--color-warning);
+}
+
+.booking-calendar__day-caption {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (hover: hover) {
+  .booking-calendar__grid
+    .booking-calendar__day--available:not(.booking-calendar__day--selected):not([aria-disabled='true']):hover {
+    border-color: var(--color-accent);
+    background: var(--color-paper-sunk);
+  }
+
+  .booking-calendar__grid
+    .booking-calendar__day--pending:not(.booking-calendar__day--selected):not([aria-disabled='true']):hover {
+    border-color: var(--color-accent-deep);
+  }
+}
+
+/* Pending — another unconfirmed request exists; still selectable */
+.booking-calendar__day--pending {
+  border-color: var(--color-warning);
+  background: var(--color-warning-tint);
+}
+
+/* Unavailable / blocked — strikethrough on the number */
+.booking-calendar__day--unavailable {
+  border-color: var(--color-hairline);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  cursor: not-allowed;
+}
+
+.booking-calendar__day--unavailable .booking-calendar__day-number {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+/* Past — explicit tokens (never opacity), no border, regular weight */
+.booking-calendar__day--past {
+  border-color: transparent;
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  font-weight: 400;
+  cursor: not-allowed;
+}
+
+/* Beyond the booking horizon — not bookable yet; dotted, unlike "past" */
+.booking-calendar__day--beyond {
+  border-style: dotted;
+  border-color: var(--color-line);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  font-weight: 400;
+  cursor: not-allowed;
+}
+
+/* Availability not confirmed yet (loading) or unknown (error) */
+.booking-calendar__day--unverified {
+  border-style: dashed;
+  color: var(--color-ink-muted);
+  cursor: progress;
+}
+
+/* Selected — accent fill, surface text (4.9:1), check mark */
+.booking-calendar__day--selected {
+  border-color: var(--color-accent-deep);
+  color: var(--color-surface);
+  background: var(--color-accent);
+}
+
+.booking-calendar__day--selected .booking-calendar__mark--pending {
+  color: currentColor;
+}
+
+/* Today — its own pseudo-element ring, so it never competes with the focus
+   ring (outline) or the selected fill; all three can show at once. */
+.booking-calendar__day--today::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+}
+
+/* ---------- Legend ---------- */
+.booking-calendar__legend {
+  display: flex;
+  margin-block-start: var(--space-md);
+  padding: 0;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  list-style: none;
+}
+
+.booking-calendar__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--color-ink);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.booking-calendar__day--swatch {
+  width: var(--control-height);
+  min-height: var(--control-height);
+  flex: 0 0 auto;
+  cursor: default;
+  transition: none;
+}
+
+/* ---------- Selection summary ---------- */
+.booking-calendar__selection {
+  margin-block-start: var(--space-md);
+  padding: var(--space-sm);
+  border-inline-start: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+}
+
+.booking-calendar__selection-summary {
+  display: grid;
+  gap: var(--space-3xs);
+}
+
+.booking-calendar__selection-summary span,
+.booking-calendar__no-selection {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.booking-calendar__selection-summary strong {
+  color: var(--color-ink);
+  font-size: var(--text-body-md);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.booking-calendar__pending-warning {
+  margin-block-start: var(--space-xs);
+}
+
+.booking-calendar__pending-warning .notice__icon {
+  color: var(--color-warning);
+}
+
+/* ---------- Visually hidden (screen-reader) text ---------- */
+.booking-calendar__visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Phones (below --bp-sm 36rem) ---------- */
+@media (max-width: 35.99rem) {
+  .booking-calendar__navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .booking-calendar__month {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .booking-calendar__nav-button {
+    grid-row: 2;
+  }
+
+  .booking-calendar__error {
+    flex-direction: column;
+  }
+
+  .booking-calendar__error-body {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .booking-calendar__error-body .btn {
+    width: 100%;
+  }
+}
+
+/* ---------- Small phones (375px and below) ----------
+   Seven columns need nearly every pixel to keep 44px-wide days
+   (--control-height). Only the grid widens into the card's inline padding
+   (to 4px from its border) and the gaps drop to 1px; the text keeps its
+   inset. A 360px viewport (16px page gutters) then still gives ~44.5px per
+   day. Below ~356px seven 44px columns cannot fit at all: days narrow
+   (~39px at 320px) but stay 52px tall, well above WCAG 2.2 AA's 24px
+   target minimum. */
+@media (max-width: 23.4375rem) {
+  .booking-calendar {
+    --booking-calendar-gap: 1px;
+  }
+
+  .booking-calendar__grid {
+    margin-inline: calc(
+      var(--space-3xs) - var(--booking-calendar-padding-inline)
+    );
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .booking-calendar__day {
+    transition: none;
+  }
+}

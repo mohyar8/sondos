@@ -1,0 +1,522 @@
+/* =============================================================================
+   Home (/) — design-system §5.2. Section backgrounds alternate paper, sunk
+   paper and surface so the ivory stays dominant (§1.1's 60/30/10); gold is
+   kept to eyebrows, markers and hairline accents. Logical properties only.
+   The scroll-reveal classes (.reveal …) are defined in styles/motion.css and
+   driven by layout/useReveal.ts.
+   Breakpoints: 36rem / 48rem / 64rem / 80rem (tokens.css).
+   ========================================================================= */
+
+/* ---------- Shared: photo frames filled edge to edge ---------- */
+.home-hero__image,
+.home-featured__image {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* =====================================================================
+   1. Hero — text column first in the DOM (start/right column in RTL from
+   64rem); on phones the photo is shown first, above the text.
+   ===================================================================== */
+.home-hero {
+  padding-block: clamp(1.5rem, 5vw, 4rem);
+  background: var(--color-surface);
+}
+
+.home-hero__layout {
+  display: grid;
+  align-items: center;
+  gap: clamp(2rem, 6vw, 5rem);
+}
+
+.home-hero__content {
+  max-inline-size: 36rem;
+}
+
+.home-hero__title {
+  margin-block-start: var(--space-xs);
+  font-family: var(--font-display);
+  font-size: var(--text-display-xl);
+  font-weight: 600;
+  line-height: var(--leading-display);
+  text-wrap: balance;
+}
+
+.home-hero__lead {
+  max-inline-size: 34rem;
+  margin-block-start: var(--space-md);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+}
+
+.home-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-block-start: var(--space-lg);
+}
+
+.home-hero__media {
+  position: relative;
+  order: -1;
+  overflow: hidden;
+  inline-size: 100%;
+  aspect-ratio: 4 / 5;
+  max-block-size: 70svh;
+  border-radius: var(--radius-md);
+}
+
+/* §5.2: slow scale(1 → 1.05) over 8s on load. Under reduced motion,
+   base.css collapses the animation so the photo is simply static. */
+.home-hero__image {
+  animation: hero-zoom 8s var(--ease-decelerate) forwards;
+}
+
+/* =====================================================================
+   2. Story — the one «أنا» moment: a text-only breathing band.
+   ===================================================================== */
+.home-story {
+  background: var(--color-paper);
+}
+
+.home-story__layout {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.home-story__label {
+  padding-block-start: var(--space-xs);
+  border-block-start: 1px solid var(--color-accent-soft);
+  inline-size: fit-content;
+}
+
+.home-story__content {
+  max-inline-size: 47rem;
+}
+
+.home-story__title {
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.home-story__content p {
+  max-inline-size: 42rem;
+  margin-block-start: var(--space-md);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+}
+
+.home-story__content p + p {
+  margin-block-start: var(--space-sm);
+}
+
+/* =====================================================================
+   3. What makes her work different — four cards.
+   ===================================================================== */
+.home-difference {
+  background: var(--color-paper-sunk);
+}
+
+.home-difference__grid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.home-difference__card {
+  border-block-start: 2px solid var(--color-accent);
+}
+
+.home-difference__card h3,
+.home-services__card h3 {
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+}
+
+.home-difference__card p,
+.home-services__card p {
+  margin-block-start: var(--space-2xs);
+  color: var(--color-ink-muted);
+}
+
+/* =====================================================================
+   4. Featured work — a swipe row on phones, one row of three from 48rem.
+   ===================================================================== */
+.home-featured {
+  background: var(--color-paper);
+}
+
+/* The row bleeds to the screen edges on phones, while its first tile still
+   lines up with the text above it (padding + scroll-padding). overflow-x is
+   the one axis-named property here: `overflow-inline` is not supported by
+   Chromium or WebKit yet. It is an axis, not a side, so RTL is unaffected. */
+.home-featured__list {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-inline: calc(var(--page-gutter) * -1);
+  padding-inline: var(--page-gutter);
+  padding-block: var(--space-3xs) var(--space-xs);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scroll-padding-inline: var(--page-gutter);
+  scrollbar-width: thin;
+}
+
+/* The row spans the full screen width on phones: draw its focus ring inside
+   so the screen edge never clips it. */
+.home-featured__list:focus-visible {
+  outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+.home-featured__item {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  block-size: clamp(15rem, 62vw, 22rem);
+  max-inline-size: 85%;
+  border-radius: var(--radius-md);
+  scroll-snap-align: start;
+}
+
+.home-featured__item--wide {
+  aspect-ratio: 16 / 9;
+}
+
+.home-featured__item--landscape {
+  aspect-ratio: 3 / 2;
+}
+
+.home-featured__item--portrait {
+  aspect-ratio: 4 / 5;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .home-featured__image {
+    transition: transform var(--duration-deliberate) var(--ease-standard);
+  }
+
+  .home-featured__item:hover .home-featured__image {
+    transform: scale(1.04);
+  }
+}
+
+.home-featured__more {
+  margin-block-start: var(--space-lg);
+}
+
+/* =====================================================================
+   5. Services — three cards with a small line icon.
+   ===================================================================== */
+.home-services {
+  background: var(--color-surface);
+}
+
+.home-services__grid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.home-services__card {
+  background: var(--color-paper);
+  box-shadow: none;
+}
+
+.home-services__icon {
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  margin-block-end: var(--space-sm);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-deep);
+  background: var(--color-paper-sunk);
+}
+
+.home-services__more {
+  margin-block-start: var(--space-lg);
+}
+
+/* =====================================================================
+   6. How booking works — four steps.
+   ===================================================================== */
+.home-steps {
+  background: var(--color-paper);
+}
+
+.home-steps__list {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.home-steps__item {
+  padding-block-start: var(--space-md);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.home-steps__marker {
+  display: block;
+  margin-block-end: var(--space-sm);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.home-steps__item h3 {
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+}
+
+.home-steps__item p {
+  margin-block-start: var(--space-2xs);
+  color: var(--color-ink-muted);
+}
+
+.home-steps__action {
+  margin-block-start: var(--space-xl);
+}
+
+/* =====================================================================
+   7. Trust & consent.
+   ===================================================================== */
+.home-trust {
+  background: var(--color-paper-sunk);
+}
+
+.home-trust__layout {
+  display: grid;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.home-trust__heading {
+  margin-block-end: 0;
+}
+
+.home-trust__badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.home-trust__badge {
+  gap: var(--space-2xs);
+  padding-block: var(--space-xs);
+  padding-inline: var(--space-sm);
+  border-inline-start-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.home-trust__badge .badge__icon {
+  inline-size: 1.5em;
+  block-size: 1.5em;
+  color: var(--color-accent-deep);
+}
+
+/* =====================================================================
+   8. FAQ — native <details>/<summary> (keyboard and screen-reader support
+   built in). Open/closed is shown by the plus/minus shape, not by colour.
+   ===================================================================== */
+.home-faq {
+  background: var(--color-paper);
+}
+
+.home-faq__list {
+  max-inline-size: 52rem;
+  border-block-start: 1px solid var(--color-line);
+}
+
+.home-faq__item {
+  border-block-end: 1px solid var(--color-line);
+}
+
+.home-faq__question {
+  display: block;
+  min-block-size: var(--control-height);
+  padding-block: var(--space-sm);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-heading-sm);
+  font-weight: 700;
+  line-height: var(--leading-heading);
+}
+
+.home-faq__question-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.home-faq__question::-webkit-details-marker {
+  display: none;
+}
+
+@media (hover: hover) {
+  .home-faq__question:hover {
+    color: var(--color-accent-deep);
+  }
+}
+
+.home-faq__icon {
+  flex: 0 0 auto;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  color: var(--color-accent-deep);
+}
+
+.home-faq__icon .disclosure-icon__vertical {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.home-faq__item[open] .disclosure-icon__vertical {
+  transform: scaleY(0);
+}
+
+.home-faq__answer {
+  max-inline-size: 46rem;
+  padding-block-end: var(--space-md);
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body-md);
+}
+
+.home-faq__answer > * + * {
+  margin-block-start: var(--space-xs);
+}
+
+.home-faq__prices {
+  max-inline-size: 22rem;
+}
+
+.home-faq__prices li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-3xs);
+  border-block-end: 1px solid var(--color-hairline);
+}
+
+.home-faq__price {
+  color: var(--color-ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* In-copy links: the underline is the signal, colour is secondary (§4.2). */
+.home-faq__link {
+  border-block-end: 1px solid var(--color-line);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+@media (hover: hover) {
+  .home-faq__link:hover {
+    border-block-end-color: var(--color-accent);
+  }
+}
+
+/* ---------- Print: never leave a not-yet-revealed element invisible ---------- */
+@media print {
+  .home .reveal.reveal--armed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* =====================================================================
+   Responsive
+   ===================================================================== */
+@media (min-width: 36rem) {
+  .home-difference__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 48rem) {
+  .home-story__layout {
+    grid-template-columns: minmax(10rem, 0.4fr) minmax(0, 1fr);
+  }
+
+  .home-difference__grid,
+  .home-services__grid {
+    gap: var(--space-md);
+  }
+
+  .home-services__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-steps__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-lg);
+  }
+
+  .home-trust__layout {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+
+  /* One justified row: every tile grows in proportion to its width/height
+     ratio, so all three share the same height at their native ratios. */
+  .home-featured__list {
+    gap: var(--space-md);
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+
+  .home-featured__item {
+    flex: 1 1 0;
+    min-inline-size: 0;
+    block-size: auto;
+    max-inline-size: none;
+  }
+
+  .home-featured__item--wide {
+    flex-grow: 1.7778;
+  }
+
+  .home-featured__item--landscape {
+    flex-grow: 1.5;
+  }
+
+  .home-featured__item--portrait {
+    flex-grow: 0.8;
+  }
+}
+
+@media (min-width: 64rem) {
+  .home-hero__layout {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  }
+
+  /* The text column is narrower here than on a stacked tablet layout, so the
+     headline scales with the viewport and reaches the token's cap later. */
+  .home-hero__title {
+    font-size: min(var(--text-display-xl), 4.8vw);
+  }
+
+  .home-hero__media {
+    order: 0;
+    aspect-ratio: auto;
+    block-size: min(calc(100svh - var(--site-header-height) - 6rem), 46rem);
+    min-block-size: 32rem;
+    max-block-size: none;
+  }
+
+  .home-steps__list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

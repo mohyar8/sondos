@@ -1,0 +1,150 @@
+/* =============================================================================
+   Packages (/packages) — design-system §5.4: a short photo banner carrying
+   the page H1, the four booking steps, then the configurator section
+   (id="packages", unchanged component). Logical properties only.
+   Breakpoints: 36/48/64/80rem (tokens.css).
+   ========================================================================= */
+
+/* ---------- 1. Banner ---------- */
+
+/* Its own stacking context, so the photo (-2) and the scrim (-1) stay behind
+   the text without escaping the banner. The dominant-colour placeholder is
+   set inline; the fixed min-height means nothing moves when the photo
+   arrives. */
+.packages-banner {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-block-size: clamp(18rem, 46vw, 28rem);
+  overflow: hidden;
+  color: var(--color-paper);
+}
+
+.packages-banner__image {
+  position: absolute;
+  z-index: -2;
+  inset-block: 0;
+  inset-inline: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: 50% 45%;
+}
+
+/* Ink scrim, strongest where the text sits (the block end): paper text stays
+   at or above 4.5:1 even over the photo's white flowers. */
+.packages-banner::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  inset-inline: 0;
+  background: linear-gradient(
+    to top,
+    rgb(var(--shadow-ink) / 0.92) 0%,
+    rgb(var(--shadow-ink) / 0.8) 40%,
+    rgb(var(--shadow-ink) / 0.55) 72%,
+    rgb(var(--shadow-ink) / 0.2) 100%
+  );
+}
+
+.packages-banner__content {
+  padding-block: var(--space-2xl) var(--space-lg);
+}
+
+.packages-banner__title {
+  max-inline-size: 36rem;
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.packages-banner__text {
+  max-inline-size: 36rem;
+  margin-block-start: var(--space-xs);
+  color: var(--color-paper);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+}
+
+/* ---------- 2. Booking steps ---------- */
+.packages-steps {
+  border-block-end: 1px solid var(--color-hairline);
+  background: var(--color-surface);
+}
+
+.packages-steps__list {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.packages-steps__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding-block-start: var(--space-md);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.packages-steps__marker {
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.packages-steps__item h3 {
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+}
+
+.packages-steps__note {
+  max-inline-size: 47rem;
+  margin-block-start: var(--space-xl);
+  color: var(--color-ink-muted);
+  line-height: var(--leading-body-lg);
+}
+
+/* ---------- 3. Packages (configurator) ---------- */
+.packages-section {
+  background: var(--color-paper);
+}
+
+/* ---------- Print: never leave a not-yet-revealed element invisible ---------- */
+@media print {
+  .packages-page .reveal.reveal--armed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (min-width: 36rem) {
+  .packages-steps__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .packages-banner__content {
+    padding-block-end: var(--space-2xl);
+  }
+
+  .packages-steps__list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-lg);
+  }
+
+  .packages-steps__item {
+    display: block;
+  }
+
+  .packages-steps__marker {
+    display: block;
+    margin-block-end: var(--space-sm);
+  }
+}

@@ -1,0 +1,10 @@
+/* =============================================================================
+   Style entry point — ordered import hub only. Each layer is documented in
+   src/styles/README.md.
+   ========================================================================= */
+
+@import "./styles/fonts.css";
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/components.css";
+@import "./styles/motion.css";

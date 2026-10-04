@@ -1,0 +1,201 @@
+/* =============================================================================
+   Portfolio (/portfolio) — design-system §5.3 and §4.10, decision D12.
+   Every tile keeps its photo's native ratio (16:9, 3:2 or 4:5): nothing is
+   cropped and the reserved box means nothing shifts while photos load.
+   Phones show one column. From 36rem the tiles flow into justified rows: all
+   tiles in a row share one height, and each one's width follows its ratio,
+   so landscape tiles take more of the row and portrait tiles stand tall.
+   Visual order always equals DOM order (no dense packing, no :nth-child
+   pinning), so tabbing through the tiles never jumps around the page.
+   Logical properties only. Breakpoints: 36/48/64/80rem (tokens.css).
+   ========================================================================= */
+
+.portfolio-gallery {
+  background: var(--color-paper);
+}
+
+/* ---------- Category filter: pills, the pressed one filled and ticked ---------- */
+.portfolio-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-block-end: var(--space-lg);
+}
+
+.portfolio-filter__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-block-size: var(--control-height);
+  padding-inline: var(--space-md);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-full);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+/* The tick is the non-colour signal of the pressed state. */
+.portfolio-filter__check {
+  display: none;
+  flex: none;
+}
+
+.portfolio-filter__option[aria-pressed="true"] {
+  border-color: var(--color-ink);
+  color: var(--color-surface);
+  background: var(--color-ink);
+}
+
+.portfolio-filter__option[aria-pressed="true"] .portfolio-filter__check {
+  display: block;
+}
+
+@media (hover: hover) {
+  .portfolio-filter__option[aria-pressed="false"]:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent-deep);
+  }
+}
+
+/* ---------- Grid ---------- */
+.portfolio-grid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.portfolio-grid__item {
+  min-inline-size: 0;
+}
+
+.portfolio-grid__item--wide {
+  aspect-ratio: 16 / 9;
+}
+
+.portfolio-grid__item--landscape {
+  aspect-ratio: 3 / 2;
+}
+
+.portfolio-grid__item--portrait {
+  aspect-ratio: 4 / 5;
+}
+
+/* The tile is the button; its dominant-colour placeholder is set inline. */
+.portfolio-tile {
+  position: relative;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: zoom-in;
+}
+
+.portfolio-tile__image {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* D12: a slow scale on hover, only with a real pointer and motion allowed. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .portfolio-tile__image {
+    transition: transform calc(var(--duration-deliberate) * 1.5) var(--ease-standard);
+  }
+
+  .portfolio-tile:hover .portfolio-tile__image {
+    transform: scale(1.04);
+  }
+}
+
+/* ---------- Closing WhatsApp inquiry ---------- */
+.portfolio-gallery__inquiry {
+  display: flex;
+  justify-content: center;
+  margin-block-start: var(--space-xl);
+}
+
+.portfolio-gallery__inquiry-link {
+  gap: var(--space-2xs);
+}
+
+.portfolio-gallery__inquiry-icon {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex: none;
+}
+
+/* ---------- Print: never leave a not-yet-revealed tile invisible ---------- */
+@media print {
+  .portfolio-page .reveal.reveal--armed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* =====================================================================
+   Justified rows. Each tile's flex-basis AND flex-grow are proportional to
+   its ratio, so every tile in a line grows by the same height and all of
+   them keep their native ratio exactly. The ::after spacer soaks up the
+   free space of the last line, so a short last line keeps the target
+   height instead of blowing its photos up.
+   ===================================================================== */
+@media (min-width: 36rem) {
+  .portfolio-grid {
+    --portfolio-row: 10rem;
+
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .portfolio-grid::after {
+    content: "";
+    flex: 1000 1 0;
+  }
+
+  .portfolio-grid__item--wide {
+    flex: 1.7778 1 calc(var(--portfolio-row) * 1.7778);
+  }
+
+  .portfolio-grid__item--landscape {
+    flex: 1.5 1 calc(var(--portfolio-row) * 1.5);
+  }
+
+  .portfolio-grid__item--portrait {
+    flex: 0.8 1 calc(var(--portfolio-row) * 0.8);
+  }
+}
+
+@media (min-width: 48rem) {
+  .portfolio-grid {
+    --portfolio-row: 12.5rem;
+
+    gap: var(--space-md);
+  }
+}
+
+@media (min-width: 64rem) {
+  .portfolio-grid {
+    --portfolio-row: 14rem;
+  }
+}
+
+@media (min-width: 80rem) {
+  .portfolio-grid {
+    --portfolio-row: 16rem;
+  }
+}

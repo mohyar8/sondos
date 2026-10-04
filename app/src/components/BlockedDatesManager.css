@@ -1,0 +1,661 @@
+/* =============================================================================
+   BlockedDatesManager — admin calendar of manually blocked dates, rebuilt on
+   the shared token/component layer (runs/redo-v2/03-design-system.md §4.5
+   form fields, §4.6 dialogs, §4.7 notices, §4.13 calendar day states, §4.14
+   admin tables). Buttons, notices, the reason field and the dialog chrome
+   come from styles/components.css (.btn, .notice, .field, .dialog,
+   .dialog__backdrop, .eyebrow); this file only adds this component's layout,
+   its day states and the mobile bottom sheet. Colours are tokens only.
+   ========================================================================= */
+
+.blocked-dates-manager {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-sm);
+  color: var(--color-ink);
+}
+
+/* Text for assistive technology only (day states, "opens in a new tab"). */
+.blocked-dates-manager__visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Header card ---------- */
+.blocked-dates-manager__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.blocked-dates-manager__heading {
+  flex: 1 1 22rem;
+  min-inline-size: 0;
+}
+
+.blocked-dates-manager__title {
+  margin-block: var(--space-3xs) var(--space-2xs);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+}
+
+.blocked-dates-manager__intro {
+  max-inline-size: 52rem;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+.blocked-dates-manager__preview-link {
+  flex: 0 0 auto;
+}
+
+/* ---------- Month toolbar ---------- */
+.blocked-dates-manager__toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-sunk);
+}
+
+.blocked-dates-manager__month {
+  min-inline-size: 0;
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+  text-align: center;
+}
+
+/* ---------- Notices (base look from .notice) ---------- */
+.blocked-dates-manager__notice {
+  overflow-wrap: anywhere;
+}
+
+.blocked-dates-manager__notice-body {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-xs);
+}
+
+.blocked-dates-manager__icon--success {
+  color: var(--color-success);
+}
+
+.blocked-dates-manager__icon--danger {
+  color: var(--color-danger);
+}
+
+.blocked-dates-manager__icon--warning {
+  color: var(--color-warning);
+}
+
+.blocked-dates-manager__icon--info {
+  color: var(--color-info);
+}
+
+.blocked-dates-manager__icon--neutral {
+  color: var(--color-ink-muted);
+}
+
+/* ---------- Calendar grid (§4.13 + the §4.14 table treatment) ---------- */
+.blocked-dates-manager__calendar {
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.blocked-dates-manager__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.blocked-dates-manager__row--head {
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.blocked-dates-manager__row--week + .blocked-dates-manager__row--week {
+  border-block-start: 1px solid var(--color-hairline);
+}
+
+.blocked-dates-manager__weekday {
+  min-inline-size: 0;
+  padding-block: var(--space-xs);
+  padding-inline: var(--space-3xs);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.blocked-dates-manager__cell {
+  display: flex;
+  min-inline-size: 0;
+}
+
+.blocked-dates-manager__cell + .blocked-dates-manager__cell {
+  border-inline-start: 1px solid var(--color-hairline);
+}
+
+.blocked-dates-manager__cell--empty {
+  background: var(--color-paper);
+}
+
+/* ---------- Day button ---------- */
+.blocked-dates-manager__day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3xs);
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: clamp(3.75rem, 9vw, 6.25rem);
+  padding: clamp(0.375rem, 1.4vw, 0.75rem);
+  border: 0;
+  border-radius: 0;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+/* The grid clips overflow, so the focus ring is drawn inside the cell. */
+.blocked-dates-manager__day:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc((var(--focus-ring-width) + 2px) * -1);
+}
+
+@media (hover: hover) {
+  .blocked-dates-manager__day:not([aria-disabled='true']):hover {
+    background: var(--color-paper-sunk);
+    box-shadow: inset 0 0 0 2px var(--color-line);
+  }
+
+  .blocked-dates-manager__day--blocked:not([aria-disabled='true']):hover {
+    background: var(--color-warning-tint);
+    box-shadow: inset 0 0 0 2px var(--color-warning);
+  }
+}
+
+.blocked-dates-manager__day-number {
+  font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.blocked-dates-manager__day-marks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3xs);
+  min-inline-size: 0;
+}
+
+.blocked-dates-manager__day-state,
+.blocked-dates-manager__today-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  max-inline-size: 100%;
+  color: var(--color-ink);
+  font-size: clamp(0.62rem, 1.5vw, 0.78rem);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.blocked-dates-manager__day-state-icon {
+  flex: 0 0 auto;
+  inline-size: 1em;
+  block-size: 1em;
+  color: var(--color-warning);
+}
+
+/* Today: a small dot before the label (§4.13 "dot below the number"). */
+.blocked-dates-manager__today-label::before {
+  flex: 0 0 auto;
+  inline-size: 0.45em;
+  block-size: 0.45em;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  content: '';
+}
+
+/* Blocked: tint + a start rule + strikethrough number + a lock-and-label mark,
+   so the state never depends on colour alone. */
+.blocked-dates-manager__day--blocked {
+  border-inline-start: 3px solid var(--color-warning);
+  background: var(--color-warning-tint);
+}
+
+.blocked-dates-manager__day--blocked .blocked-dates-manager__day-number {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+/* Today: a 2px ink ring around the cell, whatever the day's own state. */
+.blocked-dates-manager__day--today::after {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--color-ink);
+  content: '';
+  pointer-events: none;
+}
+
+/* The date whose dialog is open. */
+.blocked-dates-manager__day--selected {
+  box-shadow: inset 0 0 0 3px var(--color-accent);
+}
+
+/* Past: recessed and lighter, no strikethrough (a different meaning from
+   "blocked", so a different mark). */
+.blocked-dates-manager__day--past {
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+}
+
+.blocked-dates-manager__day--past .blocked-dates-manager__day-number {
+  font-weight: 400;
+}
+
+/* Not selectable until this month's blocked dates have loaded. */
+.blocked-dates-manager__day--waiting {
+  color: var(--color-ink-muted);
+  cursor: progress;
+}
+
+.blocked-dates-manager__day[aria-disabled='true']:not(
+    .blocked-dates-manager__day--waiting
+  ) {
+  cursor: not-allowed;
+}
+
+/* ---------- Legend — a sample mark per state, never a colour swatch alone ---------- */
+.blocked-dates-manager__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.blocked-dates-manager__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.blocked-dates-manager__legend-sample {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2em;
+  min-inline-size: 2.25rem;
+  block-size: 1.75rem;
+  padding-inline: var(--space-3xs);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.blocked-dates-manager__legend-sample--blocked {
+  border-inline-start: 3px solid var(--color-warning);
+  background: var(--color-warning-tint);
+}
+
+.blocked-dates-manager__legend-sample--blocked s {
+  text-decoration-thickness: 2px;
+}
+
+.blocked-dates-manager__legend-icon {
+  inline-size: 0.9em;
+  block-size: 0.9em;
+  color: var(--color-warning);
+}
+
+.blocked-dates-manager__legend-sample--past {
+  border-color: var(--color-paper-sunk);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  font-weight: 400;
+}
+
+.blocked-dates-manager__legend-sample--today {
+  border: 2px solid var(--color-ink);
+}
+
+/* ---------- Dialog (chrome from .dialog / .dialog__backdrop) ---------- */
+.dialog.blocked-dates-manager__dialog {
+  inline-size: min(100% - (var(--page-gutter) * 2), 38rem);
+  block-size: fit-content;
+  padding: var(--space-md);
+}
+
+@media (min-width: 64rem) {
+  .dialog.blocked-dates-manager__dialog {
+    padding: var(--space-lg);
+  }
+}
+
+.blocked-dates-manager__dialog:focus {
+  outline: none;
+}
+
+/* Drag handle — decorative only; the close/back buttons are the real exits. */
+.blocked-dates-manager__dialog-handle {
+  display: none;
+}
+
+.blocked-dates-manager__dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-block-end: var(--space-sm);
+  padding-block-end: var(--space-sm);
+  border-block-end: 1px solid var(--color-hairline);
+}
+
+.blocked-dates-manager__dialog-title {
+  margin-block-start: var(--space-3xs);
+  font-size: var(--text-heading-md);
+  line-height: var(--leading-heading);
+}
+
+.blocked-dates-manager__dialog-close {
+  flex: 0 0 auto;
+}
+
+.blocked-dates-manager__dialog-description {
+  margin-block-end: var(--space-md);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+.blocked-dates-manager__form,
+.blocked-dates-manager__details,
+.blocked-dates-manager__delete-confirmation {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.blocked-dates-manager__form .field {
+  margin-block-end: 0;
+}
+
+.blocked-dates-manager__optional {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  font-weight: 400;
+}
+
+/* "12 / 500" reads left-to-right and sits at the field's end edge. */
+.blocked-dates-manager__counter {
+  align-self: flex-end;
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+.blocked-dates-manager__details dl {
+  display: grid;
+  margin: 0;
+}
+
+.blocked-dates-manager__details dl > div {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.35fr) minmax(0, 1fr);
+  gap: var(--space-3xs) var(--space-sm);
+  padding-block: var(--space-xs);
+  border-block-end: 1px solid var(--color-hairline);
+}
+
+.blocked-dates-manager__details dt {
+  color: var(--color-ink-muted);
+}
+
+.blocked-dates-manager__details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.blocked-dates-manager__dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-block-start: var(--space-3xs);
+}
+
+/* Destructive action — danger fill, surface text (≈7:1). Explicit disabled
+   tokens rather than opacity (§4.5). */
+.btn.blocked-dates-manager__destructive-button {
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+  background: var(--color-danger);
+}
+
+.btn.blocked-dates-manager__destructive-button--outline {
+  color: var(--color-danger);
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .btn.blocked-dates-manager__destructive-button:hover:not(:disabled) {
+    filter: brightness(0.9);
+  }
+
+  .btn.blocked-dates-manager__destructive-button--outline:hover:not(
+      :disabled
+    ) {
+    filter: none;
+    background: var(--color-danger-tint);
+  }
+}
+
+.btn.blocked-dates-manager__destructive-button:disabled {
+  border-color: var(--color-line);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  cursor: wait;
+}
+
+.blocked-dates-manager__spinner {
+  flex: 0 0 auto;
+  inline-size: 1em;
+  block-size: 1em;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: var(--radius-full);
+}
+
+/* ---------- Mobile: bottom sheet (§4.6); centred dialog from --bp-lg ---------- */
+@media (max-width: 63.99rem) {
+  .blocked-dates-manager__dialog-handle {
+    display: block;
+    inline-size: 2.75rem;
+    block-size: 0.25rem;
+    margin-block-end: var(--space-sm);
+    margin-inline: auto;
+    border-radius: var(--radius-full);
+    background: var(--color-line);
+  }
+
+  .dialog.blocked-dates-manager__dialog {
+    inset-inline: 0;
+    inset-block-start: auto;
+    inset-block-end: 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    max-block-size: min(92dvh, 42rem);
+    margin: 0;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+}
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 47.99rem) {
+  .blocked-dates-manager__toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .blocked-dates-manager__month {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .blocked-dates-manager__today-button {
+    grid-column: 1 / -1;
+  }
+
+  .blocked-dates-manager__weekday {
+    padding-inline: 0;
+    font-size: 0.66rem;
+  }
+
+  .blocked-dates-manager__day {
+    min-block-size: 4.25rem;
+    padding: 0.35rem;
+  }
+}
+
+@media (max-width: 35.99rem) {
+  .blocked-dates-manager__header {
+    padding: var(--space-sm);
+  }
+
+  .blocked-dates-manager__weekday {
+    font-size: 0.58rem;
+  }
+
+  .blocked-dates-manager__day {
+    min-block-size: 3.75rem;
+    padding: 0.28rem;
+  }
+
+  .blocked-dates-manager__day-state,
+  .blocked-dates-manager__today-label {
+    font-size: 0.6rem;
+  }
+
+  /* The strikethrough, start rule and label still mark the state. */
+  .blocked-dates-manager__day-state-icon {
+    display: none;
+  }
+
+  .blocked-dates-manager__details dl > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .blocked-dates-manager__dialog-actions > .btn {
+    inline-size: 100%;
+  }
+}
+
+/* ---------- Motion — entry only; nothing moves under reduced motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .blocked-dates-manager__backdrop {
+    animation: blocked-dates-fade-in var(--duration-fast) var(--ease-standard);
+  }
+
+  .blocked-dates-manager__spinner {
+    animation: blocked-dates-spin 800ms linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (min-width: 64rem) {
+  .blocked-dates-manager__dialog {
+    animation: blocked-dates-panel-in var(--duration-base) var(--ease-premium);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 63.99rem) {
+  .blocked-dates-manager__dialog {
+    animation: blocked-dates-sheet-in var(--duration-slow)
+      var(--ease-decelerate);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blocked-dates-manager__day {
+    transition: none;
+  }
+
+  .blocked-dates-manager__backdrop,
+  .blocked-dates-manager__dialog,
+  .blocked-dates-manager__spinner {
+    animation: none;
+  }
+}
+
+@keyframes blocked-dates-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes blocked-dates-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes blocked-dates-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes blocked-dates-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

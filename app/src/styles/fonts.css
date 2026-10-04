@@ -1,0 +1,66 @@
+/* =============================================================================
+   Fonts — self-hosted, only the weights the design system uses (03-design-system
+   §2.1: "2 font families, 3 weights total"): El Messiri 600 (display) and
+   Cairo 400 + 700 (text). Imported through @fontsource's per-weight CSS entry
+   points, which Vite resolves as npm-package CSS imports and rebases the
+   relative url(./files/…) references correctly. Each entry point already
+   ships `font-display: swap` and bundles the arabic + latin (+ latin-ext)
+   @font-face blocks for that weight — nothing else to configure.
+   No new dependency: @fontsource/cairo and @fontsource/el-messiri are already
+   installed (package.json).
+   ========================================================================= */
+
+@import "@fontsource/el-messiri/600.css";
+@import "@fontsource/cairo/400.css";
+@import "@fontsource/cairo/700.css";
+
+/* -----------------------------------------------------------------------------
+   Metric-matched fallback faces. Text renders from JS and the web fonts swap
+   in afterwards (font-display: swap), so the first paint uses a local face.
+   These faces scale Arial to Cairo's / El Messiri's widths and vertical
+   metrics, so lines wrap in the same places before and after the swap (less
+   layout shift). They sit second in --font-text / --font-display (tokens.css).
+   Values were measured (2026-09-24, fontTools) over every Arabic string in
+   src/pages and src/layout, with Arabic contextual forms applied from each
+   font's init/medi/fina substitutions (kerning and ligatures ignored):
+     size-adjust     = web-font advance width / Arial advance width
+     ascent-override = web-font hhea ascent  / unitsPerEm / size-adjust
+     descent-override= web-font hhea descent / unitsPerEm / size-adjust
+   Cairo: ascent 1303, descent 571, line gap 0 (upm 1000).
+   El Messiri: ascent 1019, descent 544, line gap 0 (upm 1000).
+   Arial carries Arabic glyphs on Windows; where a platform's Arial does not,
+   the browser falls through to the next family in the stack. Re-measure if
+   the fonts or the copy change a lot, and check CLS in Lighthouse (mobile).
+   -------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Cairo Fallback";
+  font-style: normal;
+  font-weight: 400;
+  src: local("Arial"), local("ArialMT");
+  size-adjust: 122.3%;
+  ascent-override: 106.5%;
+  descent-override: 46.7%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Cairo Fallback";
+  font-style: normal;
+  font-weight: 700;
+  src: local("Arial Bold"), local("Arial-BoldMT");
+  size-adjust: 130.8%;
+  ascent-override: 99.6%;
+  descent-override: 43.7%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "El Messiri Fallback";
+  font-style: normal;
+  font-weight: 600;
+  src: local("Arial Bold"), local("Arial-BoldMT");
+  size-adjust: 124.4%;
+  ascent-override: 81.9%;
+  descent-override: 43.7%;
+  line-gap-override: 0%;
+}

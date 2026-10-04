@@ -1,0 +1,93 @@
+/* =============================================================================
+   Motion — §3.2. Two contracts only, per this wave's scope:
+     1. `.reveal` / `.reveal--armed` / `.is-revealed` — the scroll-entry
+        animation contract. The IntersectionObserver that toggles these
+        classes lives in src/layout/useReveal.ts — this file only defines
+        what each class must mean (see src/styles/README.md).
+     2. The slow hero-media zoom keyframe from §5.2.
+   Hover/press/dialog/toast/countdown-pulse motion is either inline on its
+   own component (buttons, cards — see components.css) or belongs to a later
+   wave that owns the JS state for that component; it does not belong here.
+   ========================================================================= */
+
+/* =====================================================================
+   Reveal contract (§3.2's reduced-motion safety net, stated as a rule, not
+   just a fast version of the animation):
+
+     .reveal              → base state. ALWAYS the element's final, visible
+                             appearance (opacity: 1; transform: none). An
+                             element that only ever has this class — because
+                             JS never ran, or prefers-reduced-motion is on —
+                             is correctly, fully visible. Never invisible.
+
+     .reveal.reveal--armed → the "from" state. Only JS adds this class, and
+                             only after checking
+                             matchMedia('(prefers-reduced-motion: reduce)')
+                             is false. Apply it BEFORE the element scrolls
+                             into view.
+
+     .reveal--armed.is-revealed → the "to" state. JS adds `is-revealed` when
+                             the IntersectionObserver fires (threshold 0.15,
+                             rootMargin "0px 0px -10% 0px"), once. The
+                             transition declared on `.reveal--armed` plays
+                             between the two states.
+
+   Stagger (§3.2: "staggered 60–80ms per sibling, cap ~5 steps"): JS sets an
+   inline `--reveal-index` custom property per sibling (0, 1, 2, …, capped at
+   4); the transition-delay below reads it. An element with no
+   `--reveal-index` set gets no delay.
+   ===================================================================== */
+.reveal {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal.reveal--armed {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity var(--duration-slow) var(--ease-decelerate),
+    transform var(--duration-slow) var(--ease-decelerate);
+  transition-delay: calc(var(--reveal-index, 0) * 70ms);
+}
+
+.reveal--armed.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Explicit reduced-motion override — not just a faster transition. Without
+   this, an element JS armed but never got to mark `is-revealed` (e.g. it was
+   already on screen when JS attached, or the observer never fired) would be
+   stuck at opacity: 0 forever: the global transition-duration collapse in
+   base.css only shortens an ACTIVE transition, it does not change a
+   statically-declared property value. This rule guarantees "fully static
+   under prefers-reduced-motion" the way the design system requires. */
+@media (prefers-reduced-motion: reduce) {
+  /* Same specificity as `.reveal.reveal--armed` above (two classes), so this
+     later rule wins the cascade instead of losing to it. */
+  .reveal.reveal--armed {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* =====================================================================
+   Hero media zoom (§5.2): "slow scale(1→1.05) over 8s on load, freezes
+   under reduced motion." Defined here; applied to `.home-hero__image` in
+   src/pages/HomePage.css. Reduced motion is
+   handled by base.css's global animation-duration/iteration-count
+   collapse (the animation still runs once, landing — `forwards` — on its
+   end frame in ~0.01ms: visually static, matching every other reduced-
+   motion fallback in this system).
+   ===================================================================== */
+@keyframes hero-zoom {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.05);
+  }
+}

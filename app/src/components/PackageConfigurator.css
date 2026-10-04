@@ -1,0 +1,789 @@
+/* =============================================================================
+   Package configurator — design-system §4.1 buttons (global .btn), §4.3 cards,
+   §4.5 fields (global .input/.select/.field__*), §4.7 notices (global .notice),
+   §4.4 badges (global .badge), §5.4 packages layout.
+   Tokens only (src/styles/tokens.css); logical properties only (RTL first).
+   Breakpoint used: --bp-md 48rem (2-column configurator + sticky summary).
+   ========================================================================= */
+
+.package-configurator {
+  --configurator-sticky-offset: calc(4.75rem + var(--space-sm)); /* header min-height + gap */
+
+  color: var(--color-ink);
+  font-family: var(--font-text);
+}
+
+.configurator__form {
+  display: block;
+}
+
+/* ---------- Layout ---------- */
+.configurator__layout {
+  display: grid;
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+.configurator__controls {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-md);
+}
+
+@media (min-width: 48rem) {
+  .configurator__layout {
+    grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+    gap: var(--space-xl);
+  }
+
+  .configurator__summary {
+    position: sticky;
+    inset-block-start: var(--configurator-sticky-offset);
+    max-height: calc(100dvh - var(--configurator-sticky-offset) - var(--space-sm));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ---------- Headings shared by summary / review / success ---------- */
+.configurator__eyebrow {
+  margin: 0;
+}
+
+.configurator__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin-block: var(--space-3xs) 0;
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+  scroll-margin-block: var(--configurator-sticky-offset) var(--space-2xl);
+}
+
+.configurator__heading-icon {
+  flex: 0 0 auto;
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--color-success);
+}
+
+.configurator__subheading {
+  margin-block: 0 var(--space-xs);
+  margin-inline: 0;
+  font-family: var(--font-text);
+  font-size: var(--text-heading-sm);
+  font-weight: 700;
+  line-height: var(--leading-heading);
+}
+
+/* ---------- Option groups (fieldsets as grouping cards) ---------- */
+.configurator__section {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+@media (min-width: 64rem) {
+  .configurator__section {
+    padding: var(--space-lg);
+  }
+}
+
+.configurator__legend {
+  float: inline-start; /* keeps the legend inside the card's padding box */
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.configurator__legend + * {
+  clear: both;
+}
+
+.configurator__subsection {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.configurator__sublegend {
+  float: inline-start;
+  width: 100%;
+  margin-block: 0 var(--space-3xs);
+  margin-inline: 0;
+  padding: 0;
+  font-size: var(--text-heading-sm);
+  font-weight: 700;
+  line-height: var(--leading-heading);
+}
+
+.configurator__sublegend + * {
+  clear: both;
+}
+
+.configurator__help {
+  margin-block: var(--space-3xs) var(--space-sm);
+  margin-inline: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.configurator__album-options {
+  display: grid;
+  gap: var(--space-md);
+  margin-block-start: var(--space-md);
+  padding-block-start: var(--space-md);
+  border-block-start: 1px solid var(--color-hairline);
+}
+
+.configurator__album-options .configurator__help {
+  margin-block-end: var(--space-xs);
+}
+
+/* ---------- Option cards (radio) — selected = radio dot + 2px ink border +
+   "اختياركِ" check label + bold title: never colour alone ---------- */
+.configurator__choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  gap: var(--space-xs);
+}
+
+.configurator__choice-grid--compact {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.5rem), 1fr));
+}
+
+.configurator__choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: var(--control-height);
+  align-items: start;
+  gap: var(--space-2xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  cursor: pointer;
+}
+
+.configurator__choice--compact {
+  align-items: center;
+  padding-block: var(--space-2xs);
+  padding-inline: var(--space-sm);
+  border-radius: var(--radius-full); /* §3.1: pill = selectable chip */
+}
+
+.configurator__choice--selected {
+  border-color: var(--color-ink);
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--color-ink),
+    var(--shadow-sm);
+}
+
+@media (hover: hover) {
+  .configurator__choice:hover:not(.configurator__choice--selected) {
+    border-color: var(--color-ink-muted);
+    background: var(--color-surface);
+  }
+}
+
+.configurator__choice-input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  margin-block-start: 0.15rem;
+  accent-color: var(--color-ink);
+  cursor: pointer;
+}
+
+.configurator__choice--compact .configurator__choice-input {
+  margin-block-start: 0;
+}
+
+/* Move the focus ring onto the whole card where :has() is supported; the
+   input keeps the global :focus-visible ring otherwise. */
+@supports selector(:has(*)) {
+  .configurator__choice:has(.configurator__choice-input:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  .configurator__choice-input:focus-visible {
+    outline: none;
+  }
+}
+
+.configurator__choice-content {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3xs);
+}
+
+.configurator__choice-title {
+  font-size: var(--text-body-md);
+  font-weight: 700;
+  line-height: var(--leading-label);
+}
+
+.configurator__choice--compact .configurator__choice-title {
+  font-weight: 400;
+}
+
+.configurator__choice--compact.configurator__choice--selected .configurator__choice-title {
+  font-weight: 700;
+}
+
+.configurator__choice-meta {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.configurator__choice-price {
+  color: var(--color-ink);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__choice-state {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  justify-self: start;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding-block: 0.125rem;
+  padding-inline: var(--space-2xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  background: var(--color-paper-sunk);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+}
+
+/* Always rendered so every card keeps the same height (no layout shift when
+   the selection moves); only the selected card shows it. */
+.configurator__choice:not(.configurator__choice--selected) .configurator__choice-state {
+  visibility: hidden;
+}
+
+.configurator__choice-state-icon {
+  width: 1em;
+  height: 1em;
+  color: var(--color-success);
+}
+
+/* ---------- Album toggle (checkbox) ---------- */
+.configurator__toggle {
+  display: flex;
+  min-height: var(--control-height);
+  align-items: center;
+  gap: var(--space-xs);
+  padding-block: var(--space-2xs);
+  padding-inline: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.configurator__toggle--on {
+  border-color: var(--color-ink);
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-ink);
+}
+
+.configurator__toggle-input {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--color-ink);
+  cursor: pointer;
+}
+
+@supports selector(:has(*)) {
+  .configurator__toggle:has(.configurator__toggle-input:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  .configurator__toggle-input:focus-visible {
+    outline: none;
+  }
+}
+
+/* ---------- Quantity rows (prints, wooden enlargement) ---------- */
+.configurator__product-list {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.configurator__product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-2xs);
+  border-block-end: 1px solid var(--color-hairline);
+}
+
+.configurator__product-row:last-child {
+  border-block-end: 0;
+}
+
+.configurator__product-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.125rem;
+}
+
+.configurator__product-label {
+  font-size: var(--text-body-md);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  cursor: pointer;
+}
+
+.configurator__product-price,
+.configurator__product-limit {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__quantity {
+  flex: 0 0 auto;
+  width: 6.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- Magazine fields ---------- */
+.configurator__field-grid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+@media (min-width: 36rem) {
+  .configurator__field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.configurator__field {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3xs);
+}
+
+.configurator__field .configurator__quantity {
+  width: 100%;
+}
+
+.configurator__price-details {
+  display: grid;
+  gap: var(--space-3xs);
+  margin-block: var(--space-sm) 0;
+  margin-inline: 0;
+  padding-block: var(--space-xs);
+  padding-inline: var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-sunk);
+}
+
+.configurator__price-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.configurator__price-details dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+}
+
+.configurator__price-details dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- Sticky price summary (end column ≥48rem) ---------- */
+.configurator__summary {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.configurator__summary-lines {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding-block-start: var(--space-sm);
+  border-block-start: 1px solid var(--color-hairline);
+}
+
+.configurator__summary-lines div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.configurator__summary-lines dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.configurator__summary-lines dd {
+  flex: 0 0 auto;
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block-start: var(--space-sm);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.configurator__total span {
+  font-weight: 700;
+}
+
+.configurator__total output {
+  font-family: var(--font-display);
+  font-size: var(--text-numeral-price);
+  font-weight: 600;
+  line-height: var(--leading-display);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__disclaimer {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.configurator__cta {
+  width: 100%;
+}
+
+.configurator__message p {
+  margin: 0;
+}
+
+.configurator__message-body {
+  display: grid;
+  gap: var(--space-3xs);
+}
+
+.configurator__message-detail {
+  color: var(--color-ink-muted);
+}
+
+.configurator__message-action {
+  justify-self: start;
+  margin-block-start: var(--space-3xs);
+}
+
+/* Semantic icon colours for the global .notice (icon + tint + border = three
+   signals; the text itself always stays ink). */
+.package-configurator .notice--success .notice__icon {
+  color: var(--color-success);
+}
+
+.package-configurator .notice--danger .notice__icon {
+  color: var(--color-danger);
+}
+
+.package-configurator .notice--info .notice__icon {
+  color: var(--color-info);
+}
+
+.package-configurator .notice--warning .notice__icon {
+  color: var(--color-warning);
+}
+
+/* ---------- Mobile: sticky total bar (<48rem). It sits at the end of the
+   options column, so it stays pinned to the viewport bottom only while the
+   options are on screen, then scrolls away above the full summary card. ---------- */
+.configurator__mobile-bar {
+  position: sticky;
+  z-index: var(--z-header);
+  inset-block-end: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-2xs);
+  padding-inline: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-start-start-radius: var(--radius-md);
+  border-start-end-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.configurator__mobile-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3xs);
+  margin: 0;
+  font-size: var(--text-body-sm);
+}
+
+.configurator__mobile-total strong {
+  font-family: var(--font-display);
+  font-size: var(--text-heading-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__mobile-details {
+  flex: 0 0 auto;
+  background: var(--color-surface);
+}
+
+@media (max-width: 47.99rem) {
+  /* Keep a focused control clear of the pinned bar (WCAG 2.4.11). */
+  .configurator__controls :is(input, select, button, a):focus-visible {
+    scroll-margin-block-end: calc(var(--control-height) + var(--space-lg));
+  }
+}
+
+@media (min-width: 48rem) {
+  .configurator__mobile-bar {
+    display: none;
+  }
+}
+
+/* ---------- Review step ---------- */
+.configurator__review,
+.configurator__success {
+  display: grid;
+  gap: var(--space-md);
+  max-width: var(--container-narrow);
+  margin-inline: auto;
+  padding: var(--space-md);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+@media (min-width: 64rem) {
+  .configurator__review,
+  .configurator__success {
+    padding: var(--space-lg);
+  }
+}
+
+.configurator__review-header,
+.configurator__success-header {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.configurator__review-notice,
+.configurator__review-warning {
+  margin: 0;
+}
+
+.configurator__review-grid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+@media (min-width: 48rem) {
+  .configurator__review-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.configurator__review-card {
+  min-width: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
+.configurator__review-list,
+.configurator__success-details {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.configurator__review-list div,
+.configurator__success-details div {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.configurator__review-list dt,
+.configurator__success-details dt {
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.configurator__review-list dd,
+.configurator__success-details dd {
+  margin: 0;
+  font-weight: 700;
+  line-height: var(--leading-body-md);
+  overflow-wrap: anywhere;
+}
+
+.configurator__review-list dd[dir="ltr"],
+.configurator__success-details dd[dir="ltr"] {
+  text-align: end; /* LTR value aligned with the RTL column's start edge */
+  unicode-bidi: isolate;
+}
+
+.configurator__review-details {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.configurator__review-extras {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+  padding-inline-start: var(--space-sm);
+}
+
+.configurator__review-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-block: var(--space-sm);
+  border-block: 1px solid var(--color-line);
+}
+
+.configurator__review-total span {
+  font-weight: 700;
+}
+
+.configurator__review-total strong {
+  font-family: var(--font-display);
+  font-size: var(--text-numeral-price);
+  font-weight: 600;
+  line-height: var(--leading-display);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__review-actions,
+.configurator__success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.configurator__review-sign-out {
+  margin-inline-start: auto;
+}
+
+@media (max-width: 35.99rem) {
+  .configurator__review-actions .btn,
+  .configurator__success-actions .btn {
+    width: 100%;
+  }
+
+  .configurator__review-sign-out {
+    margin-inline-start: 0;
+  }
+}
+
+/* ---------- Success ---------- */
+.configurator__success-notice {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+@media (min-width: 36rem) {
+  .configurator__success-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.configurator__reference {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.configurator__success-explanation {
+  display: grid;
+  gap: var(--space-3xs);
+  margin: 0;
+  padding: var(--space-sm);
+  padding-inline-start: calc(var(--space-sm) + var(--space-sm));
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+/* ---------- Motion: gentle entry for the review/success steps only when
+   the visitor has not asked for reduced motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .configurator__review,
+  .configurator__success {
+    animation: configurator-step-in var(--duration-slow) var(--ease-premium) both;
+  }
+
+  .configurator__choice,
+  .configurator__toggle {
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
+  }
+}
+
+@keyframes configurator-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

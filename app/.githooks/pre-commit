@@ -1,0 +1,13 @@
+#!/bin/sh
+# W1-13 (M6, SB-19): on a release/* branch no commit is created unless the
+# full verify, with no baseline waiver, passes on what is committed. This is
+# the hook git runs when `git commit` completes a merge (after a conflict,
+# --no-commit, --squash or a failed pre-merge-commit), so a merge into
+# release/* cannot skip verify by being committed by hand.
+# Other branches return at once (verify checks the branch again itself).
+# Enable once per clone: npm run hooks:install
+case "$(git symbolic-ref --quiet --short HEAD)" in
+release/*) ;;
+*) exit 0 ;;
+esac
+exec node scripts/verify.mjs --hook=pre-commit

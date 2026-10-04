@@ -1,0 +1,187 @@
+/* =============================================================================
+   Site header — design-system §6.1. Sticky, logo + brand name on the start
+   (right) side, desktop nav from 64rem, one dominant ink primary CTA.
+   Tokens only; logical properties only.
+   ========================================================================= */
+
+.site-header {
+  position: sticky;
+  z-index: var(--z-header);
+  inset-block-start: 0;
+  border-block-end: 1px solid var(--color-hairline);
+  background: var(--color-surface);
+}
+
+/* While the mobile sheet is open the header (and the sheet it contains) must
+   sit above any sticky page element that also uses --z-header. */
+.site-header--menu-open {
+  z-index: var(--z-overlay);
+}
+
+/* Programmatic focus target after sign-in (AuthDialog completionFocusRef):
+   keep the ring inside the viewport. */
+.site-header:focus-visible {
+  outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+.site-header__inner {
+  display: flex;
+  min-block-size: var(--site-header-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+/* ---- Brand ---- */
+.site-header__brand {
+  display: inline-flex;
+  min-inline-size: 0;
+  min-block-size: var(--control-height);
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--color-ink);
+}
+
+.site-header__logo-frame {
+  flex: 0 0 auto;
+}
+
+.site-header__logo {
+  inline-size: auto;
+  block-size: 2.75rem;
+}
+
+.site-header__brand-name {
+  overflow: hidden;
+  min-inline-size: 0;
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 3.4vw, 1.2rem);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Desktop navigation (hidden below 64rem; MobileMenu takes over) ---- */
+/* `.btn` sets display too — the doubled class keeps this rule winning
+   regardless of stylesheet order. */
+.site-header__nav,
+.site-header__cta.btn {
+  display: none;
+}
+
+.site-header__nav-list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.site-header__nav-link {
+  display: inline-flex;
+  min-block-size: var(--control-height);
+  padding-inline: var(--space-2xs);
+  align-items: center;
+  color: var(--color-ink-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+  white-space: nowrap;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .site-header__nav-link:hover {
+    color: var(--color-ink);
+    box-shadow: inset 0 -1px var(--color-line);
+  }
+}
+
+/* Current page: ink text + accent underline bar (shape, not colour alone). */
+.site-header__nav-link[aria-current="page"] {
+  color: var(--color-ink);
+  box-shadow: inset 0 -2px var(--color-accent);
+}
+
+.site-header__auth {
+  display: flex;
+  align-items: center;
+  margin-inline-start: var(--space-2xs);
+  padding-inline-start: var(--space-xs);
+  border-inline-start: 1px solid var(--color-hairline);
+}
+
+.site-header__alert {
+  padding-block-end: var(--space-2xs);
+  color: var(--color-danger);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  line-height: var(--leading-body-sm);
+}
+
+@media (min-width: 64rem) {
+  .site-header__inner {
+    gap: var(--space-md);
+  }
+
+  .site-header__logo {
+    block-size: 3.5rem;
+  }
+
+  .site-header__nav {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .site-header__cta.btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding-inline: var(--space-sm);
+    white-space: nowrap;
+  }
+}
+
+/* Between 64rem and 80rem the logo, five links (one of them the two-word
+   «الخدمات والباقات»), the account button and the CTA share under 60rem:
+   tighter link padding and gaps keep the brand name from being cut off. */
+@media (min-width: 64rem) and (max-width: 79.99rem) {
+  .site-header__inner {
+    gap: var(--space-sm);
+  }
+
+  .site-header__nav-link {
+    padding-inline: var(--space-3xs);
+  }
+}
+
+/* =====================================================================
+   Account controls (NavigationAuthControls) — built on the global .btn
+   ===================================================================== */
+.nav-auth {
+  display: flex;
+  align-items: center;
+}
+
+.nav-auth__action {
+  white-space: nowrap;
+}
+
+.nav-auth__action:disabled {
+  cursor: wait;
+}
+
+.nav-auth--desktop .nav-auth__action {
+  min-inline-size: 6.5rem;
+  padding-inline: var(--space-xs);
+}
+
+.nav-auth--mobile {
+  display: grid;
+}
+
+.nav-auth__action--sign-out:not(:disabled) {
+  color: var(--color-accent-deep);
+}

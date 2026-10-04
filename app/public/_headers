@@ -1,0 +1,67 @@
+# Cloudflare Workers static-assets headers (see runs/redo-v2/05-adr-architecture.md
+# §"static SPA assets are served WITHOUT invoking the Worker" / run_worker_first).
+# No rule here touches /api/* (Worker responses never read this file).
+#
+# /* — security headers for every static response, including index.html served
+# as the SPA fallback for /, /portfolio, /packages, /my-bookings and /admin.
+# Cloudflare merges this rule with the more specific ones below.
+#
+# The CSP ships as Content-Security-Policy-Report-Only first: deploy, then open
+# the site on desktop Chrome, iOS Safari and Android and check the console for
+# "[Report Only]" violations (sign-in, registration, password reset, email
+# verification). Rename the header to Content-Security-Policy once it is clean,
+# and append "; upgrade-insecure-requests" then (browsers ignore that directive,
+# with a console warning, in a Report-Only policy).
+# Before enforcing:
+#   - confirm the authDomain (VITE_FIREBASE_AUTH_DOMAIN) matches frame-src; it is
+#     assumed to be the default for project sundus-yar-website;
+#   - drop the reCAPTCHA sources if reCAPTCHA Enterprise enforcement is off in
+#     the Firebase project; add 'unsafe-inline' to style-src only if a
+#     Report-Only violation shows the reCAPTCHA badge needs it;
+#   - the 'sha256-…' source allows the one inline script in index.html (the
+#     home-page hero preload). Editing that script changes its hash: recompute
+#     it (sha256 of the exact text between <script> and </script>, base64).
+# Cross-Origin-Opener-Policy: same-origin (audit SEC-12) cuts the link between
+# this site and any window that opened it or that it opens, so another page
+# cannot navigate a signed-in /admin tab to a look-alike sign-in (reverse
+# tabnabbing). Firebase Auth here is email/password only (no signInWithPopup
+# or signInWithRedirect), so nothing relies on window.opener.
+# HSTS is sent on /api responses by the Worker (worker/http.ts). At the
+# custom-domain cut-over add `Strict-Transport-Security: max-age=63072000;
+# includeSubDomains; preload` here too, turn on "Always Use HTTPS" for the
+# zone and submit the domain to the HSTS preload list.
+# After deploying, `curl -sI https://<prod-host>/admin` must show these headers
+# on the SPA-fallback response.
+/*
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'sha256-jNVT6TGjVN4dSmYJXmdcf7bMRJ0Iim1BVq+0kU6A4Lo=' https://apis.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self'; img-src 'self'; font-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src https://sundus-yar-website.firebaseapp.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# /assets/* — Vite's hashed JS/CSS build output (the filename itself changes on
+# every content change), safe to cache forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# /images/* — portfolio/product/brand photos, NOT hashed (an admin/content
+# update can replace a file at the same path), so a moderate cache only.
+/images/*
+  Cache-Control: public, max-age=604800
+
+# Private customer/admin views: keep them out of search results even for
+# crawlers that do not run JavaScript (04-seo.md §6.3). The SPA fallback
+# serves index.html for these paths, so the header applies to that response.
+/my-bookings
+  X-Robots-Tag: noindex, nofollow
+/admin
+  X-Robots-Tag: noindex, nofollow
+
+# Browse-only preview (audit SEC-08): keep the review copy out of search
+# engines. The rule matches by host, the preview Worker's own workers.dev
+# address (wrangler.jsonc env.preview "name"), so it is part of every build and
+# can never apply to the production host. If the preview is ever served on
+# another host, add that host here.
+https://sundus-yar-preview.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex, nofollow

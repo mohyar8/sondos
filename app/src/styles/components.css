@@ -1,0 +1,484 @@
+/* =============================================================================
+   Components — one implementation of each class (design-system §4), shared
+   by the public pages (src/pages), the layout (src/layout) and the booking
+   components. Page-specific styling lives next to each page, never as a
+   second definition of a class from this file. See src/styles/README.md for
+   the class map and a usage example.
+   Hover-only effects are scoped to `(hover: hover)` so touch input never gets
+   a stuck hover state (design-system §3.2).
+   ========================================================================= */
+
+/* =====================================================================
+   Layout primitives — .container / .container--wide, .section /
+   .section-heading
+   ===================================================================== */
+.container {
+  width: min(100% - (var(--page-gutter) * 2), var(--container));
+  margin-inline: auto;
+}
+
+.container--wide {
+  width: min(100% - (var(--page-gutter) * 2), var(--container-wide));
+  margin-inline: auto;
+}
+
+.section {
+  padding-block: var(--section-space);
+}
+
+.section-heading {
+  max-width: 47rem;
+  margin-block-end: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.section-heading h1,
+.section-heading h2 {
+  margin-block-start: var(--space-2xs);
+  /* §2.1: section-level H1/H2 are display headings — El Messiri 600. */
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.section-heading > p:last-child {
+  max-width: 39rem;
+  margin-block-start: var(--space-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+/* =====================================================================
+   Eyebrow — §1.1 accent moment, §2.1 fixes the letter-spacing-on-Arabic bug
+   ===================================================================== */
+.eyebrow {
+  color: var(--color-accent);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+/* =====================================================================
+   Buttons — §4.1. One shared base, four variants, two sizes.
+   ===================================================================== */
+.btn {
+  display: inline-flex;
+  min-height: var(--control-height);
+  padding-block: var(--space-xs);
+  padding-inline: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+  text-decoration: none;
+  user-select: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    filter var(--duration-fast) var(--ease-standard),
+    transform var(--duration-instant) var(--ease-standard);
+}
+
+.btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.98);
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* ---- Primary: ink fill — the everyday default (§1.1's accent-discipline rule:
+   gold is NOT the default button colour) ---- */
+.btn--primary {
+  border-color: transparent;
+  color: var(--color-surface);
+  background: var(--color-ink);
+}
+
+@media (hover: hover) {
+  .btn--primary:hover:not(:disabled):not([aria-disabled="true"]) {
+    filter: brightness(0.9);
+  }
+}
+
+.btn--primary:disabled,
+.btn--primary[aria-disabled="true"] {
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+}
+
+/* ---- Secondary: outlined ---- */
+.btn--secondary {
+  border-color: var(--color-line);
+  color: var(--color-ink);
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+    border-color: var(--color-accent);
+    color: var(--color-accent-deep);
+  }
+}
+
+.btn--secondary:disabled,
+.btn--secondary[aria-disabled="true"] {
+  border-color: var(--color-hairline);
+  color: var(--color-ink-muted);
+}
+
+/* ---- Ghost: low-emphasis/tertiary ---- */
+.btn--ghost {
+  border-color: transparent;
+  color: var(--color-ink);
+  background: transparent;
+}
+
+@media (hover: hover) {
+  .btn--ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-paper-sunk);
+  }
+}
+
+.btn--ghost:disabled,
+.btn--ghost[aria-disabled="true"] {
+  color: var(--color-ink-muted);
+}
+
+/* ---- WhatsApp: the one rare "accent" fill (§4.1 — same treatment as the
+   design doc's "Accent (rare)" variant; reused here under a single class
+   name for every high-value accent moment, per this wave's explicit
+   variant list). Gold, not WhatsApp-green — keeps the 5-colour system closed. ---- */
+.btn--whatsapp {
+  border-color: transparent;
+  color: var(--color-surface);
+  background: var(--color-accent);
+}
+
+@media (hover: hover) {
+  .btn--whatsapp:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--color-accent-deep);
+  }
+}
+
+.btn--whatsapp:disabled,
+.btn--whatsapp[aria-disabled="true"] {
+  color: var(--color-surface);
+  background: var(--color-line);
+}
+
+/* ---- Sizes ---- */
+.btn--lg {
+  min-height: var(--control-height-lg);
+  padding-inline: var(--space-lg);
+}
+
+/* =====================================================================
+   Text link — §4.2's "read more"-style link (the current `.text-link`
+   class role: a prominent text CTA, not a plain in-copy citation link)
+   ===================================================================== */
+.text-link {
+  display: inline-flex;
+  min-height: var(--control-height);
+  align-items: center;
+  border-block-end: 1px solid var(--color-accent);
+  color: var(--color-accent-deep);
+  font-family: var(--font-text);
+  font-weight: 700;
+  font-size: var(--text-label);
+}
+
+@media (hover: hover) {
+  .text-link:hover {
+    color: var(--color-accent);
+  }
+}
+
+/* =====================================================================
+   Card — §4.3
+   ===================================================================== */
+.card {
+  padding: var(--space-md);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (min-width: 64rem) {
+  .card {
+    padding: var(--space-lg);
+  }
+}
+
+/* Only an interactive card (a card that is itself a link/button) lifts on hover */
+.card--interactive {
+  transition:
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .card--interactive:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+}
+
+/* =====================================================================
+   Status badge — §4.4. Never colour-only: tint bg + ink text (always
+   ≥13:1) + a semantic-coloured icon slot + a semantic-coloured
+   border-inline-start — three redundant signals.
+   ===================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding-block: var(--space-3xs);
+  padding-inline: var(--space-xs);
+  border-inline-start: 3px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-sunk);
+  color: var(--color-ink);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+}
+
+.badge__icon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  color: var(--color-ink-muted);
+}
+
+.badge--info {
+  border-inline-start-color: var(--color-info);
+  background: var(--color-info-tint);
+}
+
+.badge--info .badge__icon {
+  color: var(--color-info);
+}
+
+.badge--success {
+  border-inline-start-color: var(--color-success);
+  background: var(--color-success-tint);
+}
+
+.badge--success .badge__icon {
+  color: var(--color-success);
+}
+
+.badge--warning {
+  border-inline-start-color: var(--color-warning);
+  background: var(--color-warning-tint);
+}
+
+.badge--warning .badge__icon {
+  color: var(--color-warning);
+}
+
+.badge--danger {
+  border-inline-start-color: var(--color-danger);
+  background: var(--color-danger-tint);
+}
+
+.badge--danger .badge__icon {
+  color: var(--color-danger);
+}
+
+.badge--neutral {
+  border-inline-start-color: var(--color-line);
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+}
+
+.badge--neutral .badge__icon {
+  color: var(--color-ink-muted);
+}
+
+/* =====================================================================
+   Form primitives — §4.5
+   ===================================================================== */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  margin-block-end: var(--space-md);
+}
+
+.field__label {
+  color: var(--color-ink);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 700;
+  text-align: start;
+}
+
+.field__required {
+  margin-inline-start: var(--space-3xs);
+  color: var(--color-accent);
+}
+
+.field__hint {
+  color: var(--color-ink-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.field__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  color: var(--color-danger);
+  font-family: var(--font-text);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.field textarea,
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: var(--control-height);
+  padding-block: var(--space-2xs);
+  padding-inline: var(--space-sm);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-family: var(--font-text);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.field textarea,
+.textarea {
+  min-height: calc(var(--control-height) * 2);
+  padding-block: var(--space-xs);
+  resize: vertical;
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible,
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--color-accent);
+  border-width: 2px;
+}
+
+.field--error input,
+.field--error select,
+.field--error textarea {
+  border-color: var(--color-danger);
+}
+
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled,
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  color: var(--color-ink-muted);
+  background: var(--color-paper-sunk);
+  border-color: var(--color-line);
+  cursor: not-allowed;
+}
+
+/* =====================================================================
+   Notice — §4.7 inline notice (the persistent, in-page-flow variant;
+   the ephemeral toast variant is a later wave's concern — positioning/
+   auto-dismiss needs JS it isn't this wave's job to add)
+   ===================================================================== */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2xs);
+  padding: var(--space-sm);
+  border-inline-start: 4px solid var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  background: var(--color-paper-sunk);
+  font-family: var(--font-text);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.notice__icon {
+  flex: 0 0 auto;
+  width: 1.25em;
+  height: 1.25em;
+}
+
+.notice--info {
+  border-inline-start-color: var(--color-info);
+  background: var(--color-info-tint);
+}
+
+.notice--success {
+  border-inline-start-color: var(--color-success);
+  background: var(--color-success-tint);
+}
+
+.notice--warning {
+  border-inline-start-color: var(--color-warning);
+  background: var(--color-warning-tint);
+}
+
+.notice--danger {
+  border-inline-start-color: var(--color-danger);
+  background: var(--color-danger-tint);
+}
+
+/* =====================================================================
+   Dialog primitives — §4.6. Structural/positioning only; the open/close
+   transition is wired up by whichever wave adds the JS state (AuthDialog,
+   admin action dialog, lightbox, mobile menu).
+   ===================================================================== */
+.dialog__backdrop {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset: 0;
+  background: rgb(var(--shadow-ink) / 0.55);
+}
+
+.dialog {
+  position: fixed;
+  z-index: var(--z-dialog);
+  inset-block: 0;
+  inset-inline: 0;
+  overflow-y: auto;
+  margin: auto;
+  width: min(100% - (var(--page-gutter) * 2), var(--container-narrow));
+  max-height: min(90dvh, 48rem);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}

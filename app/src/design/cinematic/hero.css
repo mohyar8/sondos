@@ -1,0 +1,275 @@
+/* =============================================================================
+   Cinematic hero entrance (12-motion-spec.md §3: E2 veil + settle, E3
+   viewfinder corners, E4 copy rise), the hero hold the logo intro relies on
+   (§4.5), the header-logo hand-off (§4.4) and the packages banner (E9). CSS
+   on the existing markup only.
+
+   Every selector starts with `:root[data-design="cinematic"]` (spelled out —
+   there is no preprocessor), so the classic build stays inert even if this
+   file leaked in, and every rule sits at specificity ≥ (0,3,0): it wins over
+   the page stylesheets whatever order Vite, or a lazy route chunk, appends
+   them in.
+
+   Entry guard (§0.2 UX-01/UX-09, §8.3): `html[data-cine-entry]` records how
+   the page was entered and stays until the next navigation.
+     absent   a plain load — everything below plays;
+     "intro"  after the logo intro — no veil, no copy rise (intro.css plays
+              one 400 ms content fade instead); the photo settle and the
+              corner lock stay;
+     "vt"     entered through a view transition — the page veil is the one
+              motion: no veil, no rise, no settle, corners at rest.
+   The guard is part of each selector, inside `:where()` so it adds no
+   specificity: nothing here has to be out-ranked later, and the print rules
+   at the end win by source order alone.
+
+   Reduced motion: every from-state and every animation is declared only
+   inside (prefers-reduced-motion: no-preference); outside it the page is the
+   classic resting page plus the static corners.
+   ========================================================================= */
+
+/* =====================================================================
+   E2 — Hero photo: veil + settle
+   ===================================================================== */
+
+/* The cinematic layer owns the hero photo's motion: the classic 8 s
+   hero-zoom is replaced, never stacked, so under reduced motion the photo
+   is simply there at scale 1. */
+:root[data-design="cinematic"] .home-hero__image {
+  animation: none;
+}
+
+/* The frame stacks its own veil (z 1) and corners (z 2) above the photo
+   without leaking those levels into the page. */
+:root[data-design="cinematic"] .home-hero__media {
+  isolation: isolate;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Settle 1.08 → 1 on `scale`; the parallax in scroll.css moves the
+     <picture>, a different element, so the two never replace each other. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-hero__image {
+    animation: cine-settle var(--cine-dur-settle) var(--cine-ease-settle) both;
+  }
+
+  /* The veil: the photo's own placeholder tone (inherited from the inline
+     background-color) covering the frame and retreating toward the inline
+     end — physical left, because the document is RTL-only — so the photo is
+     exposed from the reading edge like a print developing. The <img>
+     underneath is painted from the first frame (LCP-safe: it is never
+     hidden, only covered). Plain loads only. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry])) .home-hero__media::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    pointer-events: none;
+    background-color: inherit;
+    transform-origin: left center;
+    animation: cine-veil-out var(--cine-dur-wipe) var(--cine-ease-glide) both;
+  }
+}
+
+/* =====================================================================
+   E3 — Viewfinder corners (UX-12)
+   ===================================================================== */
+
+/* Four thin L-marks inset from the frame's corners — a photographer's
+   framing marks. Each arm is a --cine-gold line doubled by a 1 px
+   --color-ink hairline on its inner side, so the marks read on a dark photo
+   and on a light bridal hero alike. The gold gradients come first in the
+   list (painted on top): at each corner an arm's gold covers the start of
+   the other arm's hairline. Decorative: no information, no pointer.
+   Static final state for everyone; they lock on only with motion. */
+:root[data-design="cinematic"] .home-hero__media::before {
+  --cine-vf-arm: clamp(1rem, 4vw, 1.5rem);
+  --cine-vf-line: 1.5px;
+  --cine-vf-hairline: 1px;
+
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: clamp(0.625rem, 2.5vw, 1rem);
+  pointer-events: none;
+  background:
+    linear-gradient(var(--cine-gold) 0 0) left top / var(--cine-vf-arm) var(--cine-vf-line) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) left top / var(--cine-vf-line) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) right top / var(--cine-vf-arm) var(--cine-vf-line) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) right top / var(--cine-vf-line) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) left bottom / var(--cine-vf-arm) var(--cine-vf-line) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) left bottom / var(--cine-vf-line) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) right bottom / var(--cine-vf-arm) var(--cine-vf-line) no-repeat,
+    linear-gradient(var(--cine-gold) 0 0) right bottom / var(--cine-vf-line) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) left 0 top var(--cine-vf-line) / var(--cine-vf-arm) var(--cine-vf-hairline) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) left var(--cine-vf-line) top 0 / var(--cine-vf-hairline) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) right 0 top var(--cine-vf-line) / var(--cine-vf-arm) var(--cine-vf-hairline) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) right var(--cine-vf-line) top 0 / var(--cine-vf-hairline) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) left 0 bottom var(--cine-vf-line) / var(--cine-vf-arm) var(--cine-vf-hairline) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) left var(--cine-vf-line) bottom 0 / var(--cine-vf-hairline) var(--cine-vf-arm) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) right 0 bottom var(--cine-vf-line) / var(--cine-vf-arm) var(--cine-vf-hairline) no-repeat,
+    linear-gradient(var(--color-ink) 0 0) right var(--cine-vf-line) bottom 0 / var(--cine-vf-hairline) var(--cine-vf-arm) no-repeat;
+  opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Lock on (opacity 0 → 0.9, scale 1.06 → 1) once the veil has mostly
+     passed, then rest for good. At rest inside a view transition. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .home-hero__media::before {
+    animation: cine-lock var(--cine-dur-glide) var(--cine-ease-settle) var(--cine-hero-corners-delay) both;
+  }
+}
+
+/* =====================================================================
+   E4 — Hero copy rise
+   ===================================================================== */
+
+/* The display heading's word reveal (E5, DisplayHeading in a later unit)
+   starts from the same clock. Wherever the heading is rendered plain — until
+   that unit lands, or if it ever falls back to text — the title rises as one
+   block at the words' delay, so the choreography reads complete either way. */
+:root[data-design="cinematic"] .home-hero__title {
+  --cine-words-d0: var(--cine-hero-words-delay);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Eyebrow +100 ms, title (or its words) +200 ms, lead +650 ms, actions
+     +800 ms: everything readable by h0 + 1.5 s. The buttons are focusable
+     from the first frame and reach opacity 1 before their animation ends. */
+  :root[data-design="cinematic"]:where(:not([data-cine-entry])) .home-hero__content > .eyebrow {
+    animation: cine-rise var(--cine-dur-rise) var(--cine-ease-rise) var(--cine-hero-eyebrow-delay) both;
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry])) .home-hero__title:not(.cine-words) {
+    animation: cine-rise var(--cine-dur-rise) var(--cine-ease-rise) var(--cine-hero-words-delay) both;
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry])) .home-hero__lead {
+    animation: cine-rise var(--cine-dur-rise) var(--cine-ease-rise) var(--cine-hero-lead-delay) both;
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry])) .home-hero__actions {
+    animation: cine-rise var(--cine-dur-rise) var(--cine-ease-rise) var(--cine-hero-actions-delay) both;
+  }
+}
+
+/* =====================================================================
+   The hero hold (§4.5) — contract with the logo intro
+   ===================================================================== */
+
+/* While the intro plays, every hero entrance animation waits at its first
+   frame: the photo is painted (LCP-safe) and the copy sits at opacity 0
+   behind the opaque intro. When the attribute becomes "leaving" they resume
+   from zero. `.home-hero__content` itself is listed so the single fade
+   intro.css gives it after an intro is held by this same rule; the `.cine-w`
+   words arrive with DisplayHeading. Pseudo-elements cannot sit inside
+   :is(), hence the two extra selectors. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-design="cinematic"][data-cine-intro="playing"] :is(.home-hero__image, .home-hero__content, .home-hero__content > *, .home-hero__title .cine-w),
+  :root[data-design="cinematic"][data-cine-intro="playing"] .home-hero__media::before,
+  :root[data-design="cinematic"][data-cine-intro="playing"] .home-hero__media::after {
+    animation-play-state: paused;
+  }
+}
+
+/* =====================================================================
+   Header-logo hand-off (§4.4)
+   ===================================================================== */
+
+/* The intro's logo glides onto the header logo's box; the header's own copy
+   stays hidden until the landing, so there is never a double logo. The hide
+   is state, not motion, and holds regardless of the motion preference; only
+   the 180 ms fade back is motion. */
+:root[data-design="cinematic"]:is([data-cine-intro="playing"], [data-cine-intro="leaving"]) .site-header__logo {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-design="cinematic"] .site-header__logo {
+    transition: opacity var(--cine-dur-tick) linear;
+  }
+}
+
+/* =====================================================================
+   E9 — Packages banner (load)
+   ===================================================================== */
+
+/* The route's LCP image settles 1.06 → 1 and the lead rises at +500 ms.
+   No veil here: the banner's ::after is already the contrast scrim and the
+   text must stay legible from the first frame. The H1's words arrive with
+   DisplayHeading. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-design="cinematic"]:where(:not([data-cine-entry="vt"])) .packages-banner__image {
+    --cine-settle-from: var(--cine-banner-settle-from);
+
+    animation: cine-settle var(--cine-dur-settle) var(--cine-ease-settle) both;
+  }
+
+  :root[data-design="cinematic"]:where(:not([data-cine-entry])) .packages-banner__text {
+    animation: cine-rise var(--cine-dur-rise) var(--cine-ease-rise) var(--cine-banner-lead-delay) both;
+  }
+}
+
+/* =====================================================================
+   Keyframes — compositor properties only (§2 token rule 1)
+   ===================================================================== */
+@keyframes cine-settle {
+  from {
+    scale: var(--cine-settle-from);
+  }
+
+  to {
+    scale: 1;
+  }
+}
+
+@keyframes cine-veil-out {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes cine-lock {
+  from {
+    opacity: 0;
+    scale: var(--cine-lock-from);
+  }
+
+  to {
+    opacity: 0.9;
+    scale: 1;
+  }
+}
+
+@keyframes cine-rise {
+  from {
+    opacity: 0;
+    translate: 0 var(--cine-rise);
+  }
+
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* =====================================================================
+   Print — paper shows the resting page: no veil box, no held or delayed
+   from-state. Same selectors as the rules above, later in the file.
+   ===================================================================== */
+@media print {
+  :root[data-design="cinematic"] .home-hero__media::after {
+    content: none;
+  }
+
+  /* `.home-hero__content > :is(...)` is (0,4,0), the E4 rules' weight. */
+  :root[data-design="cinematic"] .home-hero__media::before,
+  :root[data-design="cinematic"] .home-hero__image,
+  :root[data-design="cinematic"] .home-hero__content > :is(.eyebrow, .home-hero__title, .home-hero__lead, .home-hero__actions),
+  :root[data-design="cinematic"] .packages-banner__image,
+  :root[data-design="cinematic"] .packages-banner__text {
+    animation: none;
+  }
+}

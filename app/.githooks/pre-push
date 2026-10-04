@@ -1,0 +1,8 @@
+#!/bin/sh
+# W1-13 (M6, SB-19): every push runs the full verify (gates, lint, tsc -b,
+# both design builds, npm test) and is blocked unless it passes; a push of a
+# release/* branch or a release-* tag is verified with no baseline waiver.
+# Git passes the refs being pushed on stdin; verify reads them and refuses a
+# push whose commits are not the clean, checked-out tree it tested.
+# Enable once per clone: npm run hooks:install
+exec node scripts/verify.mjs --hook=pre-push

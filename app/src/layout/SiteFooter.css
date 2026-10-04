@@ -1,0 +1,131 @@
+/* =============================================================================
+   Site footer — design-system §6.3. Ink background (.on-dark context),
+   four columns (brand · contact · social · quick links) that stack on
+   phones, bottom copyright bar. Tokens only; logical properties only.
+   ========================================================================= */
+
+.site-footer {
+  color: var(--color-ink-on-dark-muted);
+  background: var(--color-ink);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.site-footer__inner {
+  display: grid;
+  gap: var(--space-xl);
+  padding-block: var(--space-2xl) var(--space-xl);
+}
+
+@media (min-width: 36rem) {
+  .site-footer__inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .site-footer__brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 64rem) {
+  .site-footer__inner {
+    grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+  }
+
+  .site-footer__brand {
+    grid-column: auto;
+  }
+}
+
+/* ---- Brand ---- */
+.site-footer__brand-name {
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.site-footer__tagline {
+  margin-block-start: var(--space-2xs);
+  max-inline-size: 28rem;
+}
+
+.site-footer__trust {
+  display: grid;
+  gap: var(--space-2xs);
+  margin-block-start: var(--space-md);
+  color: var(--color-paper);
+}
+
+.site-footer__trust li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* Decorative diamond bullet in the accent tint. */
+.site-footer__trust li::before {
+  flex: 0 0 auto;
+  inline-size: 0.4rem;
+  block-size: 0.4rem;
+  background: var(--color-accent-soft);
+  content: "";
+  rotate: 45deg;
+}
+
+/* ---- Columns ---- */
+.site-footer__heading {
+  margin-block-end: var(--space-xs);
+  color: var(--color-paper);
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--leading-label);
+}
+
+.site-footer__list {
+  display: grid;
+  gap: var(--space-3xs);
+}
+
+.site-footer__link {
+  display: inline-flex;
+  inline-size: fit-content;
+  min-block-size: var(--control-height);
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--color-paper);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.35em;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    text-decoration-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .site-footer__link:hover {
+    color: var(--color-accent-soft);
+    text-decoration-color: currentColor;
+  }
+}
+
+/* Current page in the quick links: underline, not colour alone. */
+.site-footer__link[aria-current="page"] {
+  text-decoration-color: var(--color-accent-soft);
+}
+
+.site-footer__icon {
+  flex: 0 0 auto;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  color: var(--color-accent-soft);
+}
+
+/* ---- Bottom bar ---- */
+.site-footer__bottom {
+  padding-block: var(--space-md);
+  border-block-start: 1px solid var(--color-ink-muted);
+}

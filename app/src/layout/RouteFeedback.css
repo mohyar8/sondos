@@ -1,0 +1,144 @@
+/* =============================================================================
+   Route feedback — the Suspense fallback (RouteFallback) and the chunk/render
+   error state (RouteErrorBoundary). Three placements:
+     --page    replaces a page's <main> between the header and the footer
+     --screen  full-screen layer (the email-verification gate while it loads)
+     --inline  a compact row inside the sticky header (sign-in dialog)
+   ========================================================================= */
+
+.route-feedback {
+  display: grid;
+  place-items: center;
+  padding-block: var(--space-xl);
+  padding-inline: var(--page-gutter);
+  color: var(--color-ink);
+  text-align: center;
+}
+
+/* Reserves about one screen so the footer does not jump up and back down
+   while a page chunk downloads (no layout shift once the page arrives). */
+.route-feedback--page {
+  min-block-size: calc(100vh - var(--site-header-height, 4rem));
+  min-block-size: calc(100dvh - var(--site-header-height, 4rem));
+}
+
+.route-feedback--screen {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset: 0;
+  overflow-y: auto;
+  background: var(--color-paper);
+}
+
+.route-feedback--inline {
+  place-items: start;
+  padding-block: var(--space-2xs);
+  text-align: start;
+}
+
+/* ---------- Loading ---------- */
+.route-feedback__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+  /* Fast loads never flash a spinner: it only fades in after 300 ms. The
+     text stays in the accessibility tree the whole time. */
+  opacity: 0;
+  animation: route-feedback-reveal var(--duration-base) var(--ease-decelerate)
+    300ms forwards;
+}
+
+.route-feedback--inline .route-feedback__status {
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.route-feedback__spinner {
+  flex: 0 0 auto;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 2px solid var(--color-hairline);
+  border-block-start-color: var(--color-accent);
+  border-radius: var(--radius-full);
+  animation: route-feedback-spin 900ms linear infinite;
+}
+
+.route-feedback--inline .route-feedback__spinner {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+
+/* ---------- Error ---------- */
+.route-feedback__panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  max-inline-size: var(--container-narrow);
+}
+
+.route-feedback--inline .route-feedback__panel {
+  justify-items: start;
+  gap: var(--space-2xs);
+  max-inline-size: none;
+}
+
+.route-feedback__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-heading-md);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.route-feedback--inline .route-feedback__title {
+  color: var(--color-danger);
+  font-family: var(--font-text);
+  font-size: var(--text-body-sm);
+  font-weight: 700;
+  line-height: var(--leading-body-sm);
+}
+
+.route-feedback__message {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-body-md);
+  line-height: var(--leading-body-md);
+}
+
+.route-feedback--inline .route-feedback__message {
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.route-feedback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.route-feedback--inline .route-feedback__actions {
+  justify-content: flex-start;
+}
+
+@keyframes route-feedback-reveal {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes route-feedback-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* A static ring; the text still says that the page is loading. */
+@media (prefers-reduced-motion: reduce) {
+  .route-feedback__spinner {
+    animation: none;
+  }
+}

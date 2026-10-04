@@ -1,0 +1,67 @@
+/* =============================================================================
+   Cinematic motion tokens (12-motion-spec.md §2) — the only place cinematic
+   timing lives. Scoped to `:root[data-design="cinematic"]`, the attribute
+   boot.ts sets, so the classic build neither ships nor resolves them.
+   Colours are aliases of the palette in src/styles/tokens.css (no hex outside
+   that file); the classic --duration-* / --ease-* tokens stay untouched for
+   component micro-interactions. Timings are the rev. 2 values (UX-01, UX-09).
+   ========================================================================= */
+:root[data-design="cinematic"] {
+  /* ---- Durations ---- */
+  --cine-dur-tick: 180ms;         /* header-logo hand-off, small state flips */
+  --cine-dur-exit: 300ms;         /* things leaving (intro decorations) */
+  --cine-dur-vt-out: 250ms;       /* outgoing page dims under the incoming one (UX-09) */
+  --cine-dur-fade: 400ms;         /* intro veil dissolve; single hero fade after an intro (UX-01) */
+  --cine-dur-glide: 500ms;        /* logo FLIP to the header, viewfinder lock (UX-01) */
+  --cine-dur-vt-in: 450ms;        /* incoming page veil (UX-09) */
+  --cine-dur-word: 800ms;         /* one word of a display heading */
+  --cine-dur-rise: 900ms;         /* copy blocks, section reveals */
+  --cine-dur-wipe: 1100ms;        /* photo veils */
+  --cine-dur-settle-tile: 1400ms; /* portfolio tile settle (E7) */
+  --cine-dur-draw: 1600ms;        /* khatam stroke draw, whole figure */
+  --cine-dur-settle: 2400ms;      /* hero and banner photo settle */
+  --cine-dur-ticker: 60s;         /* one full ticker cycle (≈ 28 px/s for the current copy) */
+
+  /* ---- Easings ---- */
+  --cine-ease-settle: cubic-bezier(0.16, 1, 0.3, 1); /* fast start, long feathered landing (= --ease-premium) */
+  --cine-ease-rise: cubic-bezier(0.22, 1, 0.36, 1);  /* quint-out, for text */
+  --cine-ease-glide: cubic-bezier(0.65, 0, 0.25, 1); /* in-out for wipes, FLIP, page veil */
+  --cine-ease-exit: cubic-bezier(0.4, 0, 1, 1);      /* accelerate away (= --ease-accelerate) */
+  --cine-ease-ink: linear;                           /* constant brush speed inside one stroke */
+
+  /* ---- Stagger ---- */
+  --cine-stagger-word: 70ms;  /* per word; JS caps the index at 12 */
+  --cine-stagger-item: 90ms;  /* per sibling block (reveal contract; useReveal caps --reveal-index at 4) */
+  --cine-stagger-tile: 120ms; /* per photo tile */
+
+  /* ---- Distances and scales ---- */
+  --cine-rise: 22px;
+  --cine-word-rise: 0.4em;        /* em: scales with the heading size */
+  --cine-settle-from: 1.08;       /* hero photo */
+  --cine-tile-settle-from: 1.05;  /* portfolio tiles */
+  --cine-banner-settle-from: 1.06; /* packages banner (E9) */
+  --cine-parallax-shift: 4%;      /* ± within an overscan of 1.10 (5% per side) */
+  --cine-parallax-overscan: 1.1;
+  --cine-exit-shift: 6%;          /* hero/banner drift while leaving the viewport */
+  --cine-exit-overscan: 1.12;     /* grows with the drift so no edge ever shows */
+  --cine-lock-from: 1.06;         /* viewfinder corners converge from here */
+  --cine-vt-slant: 8%;            /* page-veil edge slant */
+
+  /* ---- Hero choreography (relative to release, §3 E2–E5) ---- */
+  --cine-hero-eyebrow-delay: 100ms;
+  --cine-hero-words-delay: 200ms;
+  --cine-hero-lead-delay: 650ms;
+  --cine-hero-actions-delay: 800ms;
+  --cine-hero-corners-delay: 900ms;
+
+  /* ---- Packages banner choreography (§3 E9) ---- */
+  --cine-banner-lead-delay: 500ms;
+
+  /* ---- Colour roles (aliases only) ---- */
+  --cine-gold: var(--color-accent);              /* lines on paper/surface */
+  --cine-gold-on-dark: var(--color-accent-soft); /* lines on ink or on dark photos */
+  --cine-intro-bg: var(--color-paper);
+
+  /* ---- Layer ---- */
+  --z-intro: 990; /* above header/overlay/dialog present at load, below the skip link (1000) */
+}

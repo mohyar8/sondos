@@ -1,0 +1,40 @@
+/* =============================================================================
+   Public site shell — shared layout utilities (design-system §6).
+   Header/menu/footer rules live next to their components in this folder.
+   ========================================================================= */
+
+/* Height of the sticky header; the mobile menu sheet and in-page anchor
+   targets offset themselves by it so content is never hidden underneath. */
+:root {
+  --site-header-height: 4rem;
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --site-header-height: 5rem;
+  }
+}
+
+/* Anchor targets (#main-content, #contact, #packages, …) land below the
+   sticky header, never under it. */
+main[id] {
+  scroll-margin-block-start: var(--site-header-height);
+}
+
+main [id] {
+  scroll-margin-block-start: calc(var(--site-header-height) + var(--space-sm));
+}
+
+/* Text for assistive technology only (e.g. "opens in a new tab" hints,
+   icon-only controls). */
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

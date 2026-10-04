@@ -1,0 +1,78 @@
+/* =============================================================================
+   Contact band — the closing call to action on Home and Portfolio
+   (08-copy-ar §1.9, design-system §5.2 item 5). Ink background: the `.on-dark`
+   context (tokens.css) switches the focus ring to the light accent.
+   ========================================================================= */
+
+.contact-band {
+  color: var(--color-paper);
+  background: var(--color-ink);
+}
+
+.contact-band__inner {
+  display: grid;
+  align-items: end;
+  gap: var(--space-lg);
+}
+
+.contact-band .eyebrow {
+  color: var(--color-accent-soft);
+}
+
+.contact-band__content {
+  max-inline-size: 47rem;
+}
+
+.contact-band__title {
+  margin-block-start: var(--space-2xs);
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  font-weight: 600;
+  line-height: var(--leading-heading);
+}
+
+.contact-band__text {
+  max-inline-size: 40rem;
+  margin-block-start: var(--space-sm);
+  color: var(--color-ink-on-dark-muted);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+}
+
+.contact-band__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.contact-band__icon {
+  flex: 0 0 auto;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+}
+
+/* The outlined secondary button would be ink-on-ink here: light outline and
+   text instead (border ≥ 3:1 and text ≥ 10:1 against the ink background). */
+.contact-band .btn--secondary {
+  border-color: var(--color-ink-on-dark-muted);
+  color: var(--color-paper);
+}
+
+/* Same :not() chain as the base hover rule in components.css, so this one
+   wins on specificity (its accent-deep text would be unreadable on ink). */
+@media (hover: hover) {
+  .contact-band .btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+    border-color: var(--color-accent-soft);
+    color: var(--color-accent-soft);
+  }
+}
+
+@media (min-width: 48rem) {
+  .contact-band__inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .contact-band__actions {
+    justify-content: flex-end;
+  }
+}
