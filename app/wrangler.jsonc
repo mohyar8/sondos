@@ -3,7 +3,7 @@
   "name": "sundus-yar-website",
   // The deploying account (runs/redo-v2/release/w0-inventory.md), so a
   // wrangler login to any other account cannot deploy this Worker there.
-  "account_id": "52c34fa9a7afb30c9db795d42b13df68",
+  "account_id": "3e17ec1dc1a3812e016bc5a5d7438e2d",
   "compatibility_date": "2026-08-19",
   "main": "./worker/index.ts",
   // No version Preview URLs (audit SEC-13): each old version would otherwise
@@ -29,11 +29,9 @@
     // Online confirmation (owner decision, plan 11 §1.3 D12): on, and still
     // self-gated by the admin settings and the kill switch in D1.
     "ONLINE_CONFIRMATION": "on",
-    // The new production Firebase project (decision D16) does not exist yet.
-    // This placeholder cannot be a real project id (upper case and
-    // underscores), so no ID token can match it and every sign-in is refused
-    // until W7-01 writes the real id here.
-    "FIREBASE_PROJECT_ID": "PLACEHOLDER_PRODUCTION_FIREBASE_PROJECT_ID",
+    // The production Firebase project (decision D16, created 2026-10-04).
+    // Must match VITE_FIREBASE_PROJECT_ID in .env.production.local.
+    "FIREBASE_PROJECT_ID": "sundus-yar-website",
     // Private-media admin routes need a TOTP second factor unless this is
     // exactly "off"; "off" also keeps receipts, galleries and media closed
     // (gates.ts ADMIN_MFA_DISABLED). The release preflight refuses "off".
@@ -44,12 +42,12 @@
     "ADMIN_SETTINGS_2F": "off"
   },
   // Production starts on a new, empty D1 (decision D19c), created
-  // 2026-10-01 in this account with location hint eeur.
+  // 2026-10-04 in this account with location hint eeur.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "sundus-yar-production",
-      "database_id": "3e8d75cc-fb15-4a69-9461-63c69859f5c1"
+      "database_id": "74eb69b9-4ab5-4136-924b-fa8353b93c82"
     }
   ],
   // Burst limits per 60 seconds (plan 11 §3.1, audit SEC-03; the binding

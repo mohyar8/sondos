@@ -88,7 +88,7 @@ const forbiddenVars = [
 
 describe('wrangler.jsonc', () => {
   test('production: account, no preview URLs, new D1, go-live vars (W1-03#1)', () => {
-    assert.equal(config.account_id, '52c34fa9a7afb30c9db795d42b13df68')
+    assert.equal(config.account_id, '3e17ec1dc1a3812e016bc5a5d7438e2d')
     assert.equal(config.preview_urls, false)
     assert.deepEqual(
       config.d1_databases.map(({ binding, database_name }) => [binding, database_name]),
@@ -107,7 +107,11 @@ describe('wrangler.jsonc', () => {
       const projectId = environment.vars.FIREBASE_PROJECT_ID
 
       assert.equal(typeof projectId, 'string', name)
-      assert.notEqual(projectId, 'sundus-yar-website', `${name}: old project`)
+      // sundus-yar-website was refused while its owner was unknown (D16); the
+      // owner confirmed on 2026-10-04 that they created it, so production uses it.
+      if (name !== 'production') {
+        assert.notEqual(projectId, 'sundus-yar-website', `${name}: production project`)
+      }
 
       if (projectId.startsWith('PLACEHOLDER_')) {
         assert.doesNotMatch(projectId, /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/, name)
