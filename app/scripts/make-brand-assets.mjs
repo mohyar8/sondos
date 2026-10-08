@@ -13,8 +13,10 @@
  *   - apple-touch-icon.png           aperture glyph on an opaque Paper square
  *   - icon-512.png                   aperture glyph on a Paper roundel
  *
- * The three icons are now replaced by scripts/make-favicon.mjs (the «سندس»
- * calligraphy instead of the aperture glyph): run it after this script.
+ * The site no longer uses these three icons: its icon is the owner's
+ * public/images/brand/icon-512.svg (scripts/make-favicon.mjs). Running this
+ * script brings back favicon-32.png and icon-512.png and overwrites
+ * apple-touch-icon.png: delete the first two and re-run make-favicon.mjs.
  *
  * Idempotent: re-running produces byte-identical output (no timestamps, no
  * randomness, deterministic libvips encode settings).

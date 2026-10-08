@@ -62,25 +62,20 @@ export interface BrandIcon {
 }
 
 export interface BrandIcons {
-  readonly favicon32: BrandIcon
+  readonly svg: BrandIcon
   readonly appleTouch: BrandIcon
-  readonly icon512: BrandIcon
 }
 
+/** The site icon (index.html links these; see scripts/make-favicon.mjs). */
 export const brandIcons = {
-  favicon32: {
-    src: '/images/brand/favicon-32.png',
-    width: 32,
-    height: 32,
+  svg: {
+    src: '/images/brand/icon-512.svg',
+    width: 512,
+    height: 512,
   },
   appleTouch: {
     src: '/images/brand/apple-touch-icon.png',
     width: 180,
     height: 180,
-  },
-  icon512: {
-    src: '/images/brand/icon-512.png',
-    width: 512,
-    height: 512,
   },
 } as const satisfies BrandIcons

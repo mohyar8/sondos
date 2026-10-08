@@ -1,17 +1,15 @@
 #!/usr/bin/env node
 /**
- * Generates the site icons from the official logo: the «سندس» calligraphy
- * with its aperture dot, without the "SONDOS YAR PHOTOGRAPHY" line, centred
- * on a Paper square. The source is public/images/brand/logo-ink-672.webp
- * (written by make-brand-assets.mjs), so this runs without the master logo.
+ * The site icon is public/images/brand/icon-512.svg (the owner's logo: the
+ * «سندس» calligraphy on a Paper rounded square), linked as-is from
+ * index.html. This writes the two raster copies that clients without SVG
+ * favicon support need, rendered from that same SVG:
+ *   - public/images/brand/apple-touch-icon.png   (180, iOS home screen)
+ *   - public/favicon.ico                         (16 + 32 + 48, PNG-in-ICO;
+ *                                                 Safari, and /favicon.ico
+ *                                                 requests made unasked)
  *
- * Writes, replacing the aperture-only icons make-brand-assets.mjs made:
- *   - public/images/brand/favicon-32.png
- *   - public/images/brand/icon-512.png
- *   - public/images/brand/apple-touch-icon.png   (180, opaque square for iOS)
- *   - public/favicon.ico                         (16 + 32 + 48, PNG-in-ICO)
- *
- * Usage: `node scripts/make-favicon.mjs` (run from app/).
+ * Usage: `node scripts/make-favicon.mjs` (run from app/) after changing the SVG.
  */
 
 import { writeFile } from 'node:fs/promises'
@@ -22,48 +20,17 @@ import sharp from 'sharp'
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public')
 const BRAND_DIR = path.join(PUBLIC_DIR, 'images', 'brand')
-const SOURCE = path.join(BRAND_DIR, 'logo-ink-672.webp')
+const SOURCE = path.join(BRAND_DIR, 'icon-512.svg')
+const SOURCE_SIZE = 512
 
 const COLOR_PAPER = '#FAF6EF'
-
-// The calligraphy occupies rows 0-527 of the 888x672 source; the English
-// wordmark starts below. 530 keeps the whole calligraphy and none of it.
-const CALLIGRAPHY_HEIGHT = 530
-
-// Calligraphy width as a fraction of the icon side. iOS rounds the corners of
-// the apple-touch icon itself, so that one is a plain square.
-const ICONS = [
-  { file: path.join(BRAND_DIR, 'favicon-32.png'), size: 32, fill: 0.94, radius: 0.18 },
-  { file: path.join(BRAND_DIR, 'icon-512.png'), size: 512, fill: 0.94, radius: 0.18 },
-  { file: path.join(BRAND_DIR, 'apple-touch-icon.png'), size: 180, fill: 0.86, radius: 0 },
-]
+const APPLE_TOUCH_SIZE = 180
 const ICO_SIZES = [16, 32, 48]
 
-async function calligraphy() {
-  const { width } = await sharp(SOURCE).metadata()
-
-  return sharp(SOURCE)
-    .extract({ left: 0, top: 0, width, height: CALLIGRAPHY_HEIGHT })
-    .trim()
-    .png()
-    .toBuffer()
-}
-
-async function renderIcon(glyph, size, fill, radius) {
-  const inner = Math.round(size * fill)
-  const mark = await sharp(glyph)
-    .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .toBuffer()
-  const background = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
-      `<rect width="${size}" height="${size}" rx="${size * radius}" fill="${COLOR_PAPER}"/></svg>`,
-  )
-
-  // sharp drops all metadata unless asked to keep it.
-  return sharp(background)
-    .composite([{ input: mark, gravity: 'center' }])
-    .png({ compressionLevel: 9 })
-    .toBuffer()
+/** The SVG rasterised straight at `size` px (no upscaled bitmap). */
+function render(size) {
+  return sharp(SOURCE, { density: (72 * size) / SOURCE_SIZE })
+    .resize(size, size)
 }
 
 /** An ICO file holding one PNG image per size (supported by every browser). */
@@ -89,15 +56,20 @@ function toIco(images) {
   return Buffer.concat([header, ...entries, ...images.map(({ png }) => png)])
 }
 
-const glyph = await calligraphy()
-
-for (const { file, size, fill, radius } of ICONS) {
-  await writeFile(file, await renderIcon(glyph, size, fill, radius))
-  console.log(`wrote ${path.relative(ROOT_DIR, file)}`)
-}
+// iOS ignores transparency (the SVG's rounded corners), so fill them with Paper;
+// iOS rounds the corners itself. sharp drops all metadata unless asked to keep it.
+const appleTouch = await render(APPLE_TOUCH_SIZE)
+  .flatten({ background: COLOR_PAPER })
+  .png({ compressionLevel: 9 })
+  .toBuffer()
+await writeFile(path.join(BRAND_DIR, 'apple-touch-icon.png'), appleTouch)
+console.log('wrote public/images/brand/apple-touch-icon.png')
 
 const icoImages = await Promise.all(
-  ICO_SIZES.map(async (size) => ({ size, png: await renderIcon(glyph, size, 0.94, 0.18) })),
+  ICO_SIZES.map(async (size) => ({
+    size,
+    png: await render(size).png({ compressionLevel: 9 }).toBuffer(),
+  })),
 )
 await writeFile(path.join(PUBLIC_DIR, 'favicon.ico'), toIco(icoImages))
 console.log('wrote public/favicon.ico')
