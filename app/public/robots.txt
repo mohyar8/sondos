@@ -2,3 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /my-bookings
+Disallow: /api
+
+Sitemap: https://sndsyar.com/sitemap.xml

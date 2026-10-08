@@ -334,13 +334,27 @@
   gap: var(--space-2xs);
 }
 
+/* Two grid areas: the option's text, then its quantity control. Narrow
+   screens stack the control under the text; wider ones put it in its own
+   column at the inline end. The text column is minmax(0, 1fr), so the
+   control can never take the text's space. */
 .configurator__product-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'text'
+    'quantity';
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  gap: var(--space-2xs) var(--space-sm);
   padding-block: var(--space-2xs);
   border-block-end: 1px solid var(--color-hairline);
+}
+
+@media (min-width: 36rem) {
+  .configurator__product-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'text quantity';
+  }
 }
 
 .configurator__product-row:last-child {
@@ -348,6 +362,7 @@
 }
 
 .configurator__product-text {
+  grid-area: text;
   display: grid;
   min-width: 0;
   gap: 0.125rem;
@@ -369,10 +384,17 @@
 }
 
 .configurator__quantity {
-  flex: 0 0 auto;
-  width: 6.5rem;
   text-align: center;
   font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Two classes, so this outranks the global `.input { width: 100% }` in
+   styles/components.css whatever order the production CSS chunks load in
+   (a single-class rule here lost to it on the live site). */
+.configurator__product-row > .configurator__quantity {
+  grid-area: quantity;
+  justify-self: start;
+  width: 6.5rem;
 }
 
 /* ---------- Magazine fields ---------- */
