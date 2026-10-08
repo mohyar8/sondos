@@ -13,6 +13,9 @@
  *   - apple-touch-icon.png           aperture glyph on an opaque Paper square
  *   - icon-512.png                   aperture glyph on a Paper roundel
  *
+ * The three icons are now replaced by scripts/make-favicon.mjs (the «سندس»
+ * calligraphy instead of the aperture glyph): run it after this script.
+ *
  * Idempotent: re-running produces byte-identical output (no timestamps, no
  * randomness, deterministic libvips encode settings).
  *
