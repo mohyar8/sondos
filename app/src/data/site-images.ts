@@ -848,43 +848,51 @@ export const siteImages = {
 export type SiteImageId = keyof typeof siteImages
 
 export const portfolioOrder: readonly SiteImageId[] = [
-  "bouquet-bisht",
-  "bride-entrance",
-  "hands-reaching",
-  "hands-rings-bouquet",
-  "rings-satin",
+
+ "bride-ready-suite",
+ "bride-entrance",
   "gown-floral-arch",
-  "phones-lockscreens",
-  "hands-lace-sleeve",
-  "bride-shoes",
-  "hands-ring-red-sleeve",
-  "bride-with-bishts",
-  "hands-watch",
-  "rings-exchange",
-  "ring-soft-focus",
-  "hands-fuchsia-dress",
-  "couple-banquet-hall",
-  "embrace-pink-bouquet",
+   "couple-banquet-hall",
+    "embrace-pink-bouquet",
   "paper-rose-portrait",
-  "ring-black-box",
-  "bouquet-white-lace",
+ "bouquet-white-lace",
   "hand-on-bisht",
   "clasped-hands",
   "couple-veil-stage",
   "paper-rose-gown",
   "phone-bouquet",
-  "couple-veil-hall",
+  
   "rings-closeup",
   "emotional-mirror",
   "hand-through-veil",
+
+
+  "phones-lockscreens",
+  "hands-lace-sleeve",
+  "rings-satin",
+  "bride-shoes",
+  "hands-ring-red-sleeve",
+  "hands-watch", 
+   "bouquet-bisht",
+  "rings-exchange",
+  "ring-soft-focus",
+  "hands-fuchsia-dress",
+  "hands-rings-bouquet",
+    "hands-reaching",
+ 
+  "ring-black-box",
+ 
   "gown-bisht-hangers",
   "fingers-linked",
   "hands-silver-bisht",
-  "bride-ready-suite",
+ 
   "lipstick-detail",
+"couple-veil-hall",
   "bride-gown-hanger",
+"bride-under-veil",
+
   "bride-veil-window",
-  "bride-under-veil",
+  
   "henna-hand-bisht",
   "groom-entrance",
   "couple-embrace-hall",
@@ -903,12 +911,12 @@ export const portfolioOrder: readonly SiteImageId[] = [
   "couple-tulip-bouquet",
 ]
 
-export const heroImageId: SiteImageId = "bouquet-bisht"
+export const heroImageId: SiteImageId = "ring-on-bouquet"
 
 export const homeFeatured: readonly SiteImageId[] = [
-  "hands-reaching",
-  "rings-satin",
-  "gown-floral-arch",
+ "couple-veil-hall",
+  "bride-gown-hanger",
+"bride-under-veil",
 ]
 
 export const packagesBannerId: SiteImageId = "bouquet-white-lace"

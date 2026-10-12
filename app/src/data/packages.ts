@@ -52,7 +52,7 @@ export const coverageAddonOptions = [
   {
     id: 'mobile-bts',
     label: 'تصوير بالجوال',
-    description: 'كواليس عفوية للعروسين تصلكِ يوم المناسبة نفسه عبر AirDrop.',
+    description: 'كواليس عفوية للعروسين تصلكِ عبر رابط Drive.',
     price: 200,
   },
   {
